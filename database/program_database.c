@@ -14,6 +14,8 @@
 #define STR_SIZE 1024
 #define PORT 8080
 #define N_OF_CONNECTION 5
+#define MAX_COMMANDS 128
+#define MAX_COMMAND_LENGTH 64
 
 static const char *AUTH_ERROR = "Authentication error.\nClosing connection...\n";
 static const char *ROOT = "root";
@@ -39,6 +41,30 @@ typedef struct user_t {
     char name[SIZE];
     char pass[SIZE];
 } User;
+
+void splitCommands(const char *source, char dest[MAX_COMMANDS][MAX_COMMAND_LENGTH]) {
+    int i = 0, j = 0, k = 0;
+    while (i < strlen(source)) {
+        if (source[i] == ' ') {
+            dest[j][k++] = '\0';
+            k = 0;
+            j++;
+        }
+        else {
+            dest[j][k++] = source[i];
+        }
+        i++;
+    }
+    dest[j][k++] = '\0';
+}
+
+void createDatabase(char *name) {
+    mkdir("databaseku", 0777);
+    char buff[256];
+    sprintf(buff, "databaseku/%s", name);
+    mkdir(buff, 0777);
+}
+
 void makeUser(User* user, char *name, char *pass) {
     strcpy(user->name, name);
     strcpy(user->pass, pass);
@@ -109,6 +135,17 @@ void *client(void *tmp) {
             close(new_socket);
             return 0;
         }
+
+        char commands[MAX_COMMANDS][MAX_COMMAND_LENGTH];
+        splitCommands(buffer, commands);
+
+        if (strcmp(commands[0], "CREATE") == 0) {
+            if (strcmp(commands[1], "DATABASE") == 0) {
+                createDatabase(commands[2]);
+                printf("[Log] Database %s has been created.", commands[2]);
+            }
+        }
+
         if (strlen(buffer)) {
             printf("message: %s\n", buffer);
         }

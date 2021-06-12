@@ -95,7 +95,8 @@ int main(int argc, char const *argv[]) {
     printf("type 'quit' to quit\n");
 
     while (true) {
-        scanf("%s", buffer);
+        scanf("%[^\n]s", buffer);
+        getchar();
         send(sock, buffer, strlen(buffer), 0);
 
         if (strcmp(buffer, "quit") == 0) {
