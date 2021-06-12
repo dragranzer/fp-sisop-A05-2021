@@ -23,6 +23,24 @@ void *client(void *tmp) {
     int valread;
     int new_socket = *(int *)tmp;
 
+    valread = read(new_socket, buffer, STR_SIZE);
+    if (strcmp(buffer, "root") == 0) {
+        printf("received: %s\n", buffer);
+    }
+    else if (strcmp(buffer, "error") == 0) {
+        printf("received: %s\nClosing connection...", buffer);
+        close(new_socket);
+        return 0;
+    }
+    else {
+        printf("user: %s\n", buffer);
+        memset(buffer, 0, sizeof(buffer));
+        send(new_socket, "received", strlen("received"), 0);
+        valread = read(new_socket, buffer, STR_SIZE);
+        printf("pass: %s\n", buffer);
+    }
+    memset(buffer, 0, sizeof(buffer));
+
     while (true) {
         valread = read(new_socket, buffer, STR_SIZE);
 
@@ -30,8 +48,10 @@ void *client(void *tmp) {
             close(new_socket);
             return 0;
         }
+        if (strlen(buffer)) {
+            printf("message: %s\n", buffer);
+        }
 
-        printf("message: %s\n", buffer);
         memset(buffer, 0, sizeof(buffer));
     }
 }
