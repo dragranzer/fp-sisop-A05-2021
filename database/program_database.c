@@ -42,10 +42,17 @@ typedef struct user_t {
     char pass[SIZE];
 } User;
 
-void splitCommands(const char *source, char dest[MAX_COMMANDS][MAX_COMMAND_LENGTH]) {
+bool isAlphanum(char c) {
+    if (c >= 'A' && c <= 'Z') return 1;
+    else if(c >= 'a' && c <= 'z') return 1;
+    else if(c >= '0' && c <= '9') return 1;
+    return 0;
+}
+
+void splitCommands(const char *source, char dest[MAX_COMMANDS][MAX_COMMAND_LENGTH], int *command_size) {
     int i = 0, j = 0, k = 0;
     while (i < strlen(source)) {
-        if (source[i] == ' ') {
+        if (!isAlphanum(source[i])) {
             dest[j][k++] = '\0';
             k = 0;
             j++;
@@ -56,6 +63,7 @@ void splitCommands(const char *source, char dest[MAX_COMMANDS][MAX_COMMAND_LENGT
         i++;
     }
     dest[j][k++] = '\0';
+    *command_size = j;
 }
 
 void createDatabase(char *name) {
@@ -63,6 +71,17 @@ void createDatabase(char *name) {
     char buff[256];
     sprintf(buff, "databaseku/%s", name);
     mkdir(buff, 0777);
+}
+
+void createTable(char *db, char *tb, char *attr[64], int size) {
+    char buff[256];
+    sprintf(buff, "databaseku/%s/%s.nya", db, tb);
+    FILE *fptr = fopen(buff, "w");
+    if (!fptr) return;
+    for (int i = 0; i < size; i++) {
+        fprintf(fptr, "%s,", attr[i]);
+    }
+    fclose(fptr);
 }
 
 void makeUser(User* user, char *name, char *pass) {
@@ -128,6 +147,8 @@ void *client(void *tmp) {
         return 0;
     }
 
+    char selectedDatabase[128];
+
     while (true) {
         valread = read(new_socket, buffer, STR_SIZE);
 
@@ -137,13 +158,30 @@ void *client(void *tmp) {
         }
 
         char commands[MAX_COMMANDS][MAX_COMMAND_LENGTH];
-        splitCommands(buffer, commands);
+        int command_size = 0;
+        splitCommands(buffer, commands, &command_size);
 
         if (strcmp(commands[0], "CREATE") == 0) {
             if (strcmp(commands[1], "DATABASE") == 0) {
                 createDatabase(commands[2]);
+                strcpy(selectedDatabase, commands[2]);
                 printf("[Log] Database %s has been created.", commands[2]);
             }
+            else if (strcmp(commands[1], "TABLE") == 0) {
+                // CREATE TABLE name (name int, name int)
+                char *attr[64];
+                int attr_i = 0;
+                int i = 0;
+                for (int i = 4; i < command_size; i += 3) {
+                    attr[attr_i++] = commands[i];
+                    printf("Selected %s\n", commands[i]);
+                }
+                createTable(selectedDatabase, commands[2], attr, attr_i);
+                printf("[Log] Table %s.%s has been created.", selectedDatabase, commands[2]);
+            }
+        }
+        else if(strcmp(commands[0], "USE") == 0) {
+            strcpy(selectedDatabase, commands[1]);
         }
 
         if (strlen(buffer)) {
