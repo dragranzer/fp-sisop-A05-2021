@@ -15,7 +15,53 @@
 #define PORT 8080
 #define N_OF_CONNECTION 5
 
+static const char *AUTH_ERROR = "Authentication error.\nClosing connection...\n";
+static const char *ROOT = "root";
+static const char *ERROR = "error";
+
+/*
+    A temporary stored user creds
+    Will be soon deprecated
+*/
+static const char *NAME = "haha";
+static const char *PASS = "hihi";
+
 pthread_t tid[3000];
+
+/*
+    Start of User "object" functionalities
+    Feature:
+        - a User "object" storing the user's name and password
+        - a User "constructor"
+        - function to print a User "object" contents
+*/
+typedef struct user_t {
+    char name[SIZE];
+    char pass[SIZE];
+} User;
+void makeUser(User* user, char *name, char *pass) {
+    strcpy(user->name, name);
+    strcpy(user->pass, pass);
+    return;
+}
+void printUser(User* user) {
+    printf("name: %s\npass: %s\n", user->name, user->pass);
+    return;
+}
+
+bool isRoot = false;
+
+bool authenticateServerSide(User* user) {
+    if (strcmp(user->name, ROOT) == 0) {
+        isRoot = true;
+        return true;
+    }
+    else if (strcmp(user->name, NAME) == 0 && strcmp(user->pass, PASS) == 0) {
+        return true;
+    }
+
+    return false;
+}
 
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
@@ -23,23 +69,38 @@ void *client(void *tmp) {
     int valread;
     int new_socket = *(int *)tmp;
 
+    User current;
+
+    // start receiving client's login credentials
     valread = read(new_socket, buffer, STR_SIZE);
-    if (strcmp(buffer, "root") == 0) {
-        printf("received: %s\n", buffer);
+    if (strcmp(buffer, ROOT) == 0) {
+        makeUser(&current, buffer, buffer);
     }
-    else if (strcmp(buffer, "error") == 0) {
-        printf("received: %s\nClosing connection...", buffer);
+    else if (strcmp(buffer, ERROR) == 0) {
+        printf("%s", AUTH_ERROR);
         close(new_socket);
         return 0;
     }
     else {
-        printf("user: %s\n", buffer);
+        char name[SIZE];
+        char pass[SIZE];
+
+        strcpy(name, buffer);
         memset(buffer, 0, sizeof(buffer));
         send(new_socket, "received", strlen("received"), 0);
+        
         valread = read(new_socket, buffer, STR_SIZE);
-        printf("pass: %s\n", buffer);
+        strcpy(pass, buffer);
+
+        makeUser(&current, name, pass);
     }
     memset(buffer, 0, sizeof(buffer));
+
+    if (!authenticateServerSide(&current)) {
+        printf("%s", AUTH_ERROR);
+        close(new_socket);
+        return 0;
+    }
 
     while (true) {
         valread = read(new_socket, buffer, STR_SIZE);
@@ -56,7 +117,10 @@ void *client(void *tmp) {
     }
 }
 
-// Cuma template server socket
+/*
+    Template for server socket
+    Please leave this section alone
+*/
 int main(int argc, char const *argv[]) {
     int server_fd, \
         new_socket, \

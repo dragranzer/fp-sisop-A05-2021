@@ -35,13 +35,13 @@ bool isRoot() {
 }
 
 /*
-    function: authenticateClient 
+    function: authenticateClientSide 
     authenticates the client
     @param argc
     @param argv
     @return bool
 */
-bool authenticateClient(int argc, char const *argv[]) {
+bool authenticateClientSide(int argc, char const *argv[]) {
     char buffer[STR_SIZE] = {0};
 
     if (isRoot()) {
@@ -85,9 +85,9 @@ int main(int argc, char const *argv[]) {
     }
     // End of template socket client
 
-    if (!authenticateClient(argc, argv)) {
+    if (!authenticateClientSide(argc, argv)) {
         return 0;
-    };
+    }
 
     char buffer[STR_SIZE] = {0};
     char command[STR_SIZE];
