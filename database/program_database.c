@@ -73,16 +73,22 @@ void splitCommands(const char *source, char dest[MAX_COMMANDS][MAX_COMMAND_LENGT
     int i = 0, j = 0, k = 0;
     while (i < strlen(source)) {
         if (!isAlphanum(source[i])) {
-            dest[j][k++] = '\0';
-            k = 0;
-            j++;
+            if (k) {
+                dest[j][k++] = '\0';
+                j++;
+                k = 0;
+            }
         }
         else {
             dest[j][k++] = source[i];
         }
         i++;
     }
-    dest[j][k++] = '\0';
+    if (k) {
+        dest[j][k++] = '\0';
+        j++;
+        k = 0;
+    }
     *command_size = j;
 }
 
@@ -102,6 +108,24 @@ void createTable(char *db, char *tb, char *attr[64], int size) {
         fprintf(fptr, "%s,", attr[i]);
     }
     fclose(fptr);
+}
+
+void insertToTable(char *db, char *tb, char *attr_data[64], int size) {
+    char buff[256];
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    FILE *fptr = fopen(buff, "a");
+    if (!fptr) return;
+    fprintf(fptr, "\n");
+    for (int i = 0; i < size; i++) {
+        fprintf(fptr, "%s,", attr_data[i]);
+    }
+    fclose(fptr);
+    printf("[Log] INSERT INTO %s.%s (", db, tb);
+    for (int i = 0; i < size; i++) {
+        printf("%s", attr_data[i]);
+        if (i != size-1) printf(", ");
+    }
+    printf(")\n");
 }
 
 void __createUsersTable() {
@@ -193,19 +217,19 @@ void *client(void *tmp) {
             if (strcmp(commands[1], "DATABASE") == 0) {
                 createDatabase(commands[2]);
                 strcpy(selectedDatabase, commands[2]);
-                printf("[Log] Database %s has been created.", commands[2]);
+                printf("[Log] Database %s has been created.\n", commands[2]);
             }
             else if (strcmp(commands[1], "TABLE") == 0) {
                 // CREATE TABLE name (name int, name int)
                 char *attr[64];
                 int attr_i = 0;
                 int i = 0;
-                for (int i = 4; i < command_size; i += 3) {
+                for (int i = 3; i < command_size; i += 2) {
                     attr[attr_i++] = commands[i];
                     printf("Selected %s\n", commands[i]);
                 }
                 createTable(selectedDatabase, commands[2], attr, attr_i);
-                printf("[Log] Table %s.%s has been created.", selectedDatabase, commands[2]);
+                printf("[Log] Table %s.%s has been created.\n", selectedDatabase, commands[2]);
             }
             else if (strcmp(commands[1], "USER") == 0) {
                 printf("%s\n%s\n", commands[2], commands[5]);
@@ -214,6 +238,34 @@ void *client(void *tmp) {
         else if(strcmp(commands[0], "USE") == 0) {
             strcpy(selectedDatabase, commands[1]);
         }
+        else if (strcmp(commands[0], "INSERT") == 0) {
+            if (strcmp(commands[1], "INTO") == 0) {
+                /*
+                    This function is not robust yet.
+                    Please add validation for:
+                    1. When no data is written
+                        Ex: 
+                        * INSERT INTO user
+                        * INSERT INTO user ()
+                    2. When number of data is not the same as number of column that table has
+                        Ex:
+                        * CREATE TABLE user (name string, password string)
+                        * INSERT INTO user ('Sayu', '12346', 'Female')
+                            This command is invalid since user table has 2 columns.
+                */
+                char *attr[64];
+                int attr_i = 0;
+                for (int i = 3; i < command_size; i++) {
+                    attr[attr_i++] = commands[i];
+                }
+                insertToTable(selectedDatabase, commands[2], attr, attr_i);
+            }
+        }
+
+        // printf("DEBUG Command:\n");
+        // for (int i = 0; i < command_size; i++) {
+        //     printf("%d. `%s`\n", i, commands[i]);
+        // }
 
         if (strlen(buffer)) {
             printf("message: %s\n", buffer);
