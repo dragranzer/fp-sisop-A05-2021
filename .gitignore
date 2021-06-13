@@ -2,3 +2,4 @@
 .vscode/settings.json
 client/client.o
 database/database.o
+*.nya

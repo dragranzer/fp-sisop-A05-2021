@@ -20,6 +20,15 @@
 static const char *AUTH_ERROR = "Authentication error.\nClosing connection...\n";
 static const char *ROOT = "root";
 static const char *ERROR = "error";
+static char *DB_PROG_NAME = "databaseku";
+
+/*
+    consts for making users and permission table
+    should only be used once when the DB is started
+*/ 
+static char *AUTH_DB = "auth";
+static char *USER_TABLE = "users";
+static char *PERM_TABLE = "permissions";
 
 /*
     A temporary stored user creds
@@ -41,6 +50,17 @@ typedef struct user_t {
     char name[SIZE];
     char pass[SIZE];
 } User;
+
+void makeUser(User* user, char *name, char *pass) {
+    strcpy(user->name, name);
+    strcpy(user->pass, pass);
+    return;
+}
+
+void printUser(User* user) {
+    printf("name: %s\npass: %s\n", user->name, user->pass);
+    return;
+}
 
 bool isAlphanum(char c) {
     if (c >= 'A' && c <= 'Z') return 1;
@@ -67,15 +87,15 @@ void splitCommands(const char *source, char dest[MAX_COMMANDS][MAX_COMMAND_LENGT
 }
 
 void createDatabase(char *name) {
-    mkdir("databaseku", 0777);
+    mkdir(DB_PROG_NAME, 0777);
     char buff[256];
-    sprintf(buff, "databaseku/%s", name);
+    sprintf(buff, "%s/%s", DB_PROG_NAME, name);
     mkdir(buff, 0777);
 }
 
 void createTable(char *db, char *tb, char *attr[64], int size) {
     char buff[256];
-    sprintf(buff, "databaseku/%s/%s.nya", db, tb);
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
     FILE *fptr = fopen(buff, "w");
     if (!fptr) return;
     for (int i = 0; i < size; i++) {
@@ -84,14 +104,21 @@ void createTable(char *db, char *tb, char *attr[64], int size) {
     fclose(fptr);
 }
 
-void makeUser(User* user, char *name, char *pass) {
-    strcpy(user->name, name);
-    strcpy(user->pass, pass);
-    return;
+void __createUsersTable() {
+    char *attr[64];
+    attr[0] = "name";
+    attr[1] = "pass";
+    createTable(AUTH_DB, USER_TABLE, attr, 2);
 }
-void printUser(User* user) {
-    printf("name: %s\npass: %s\n", user->name, user->pass);
-    return;
+
+void __createPermissionsTable() {
+
+}
+
+void prepareUserSchema() {
+    createDatabase(AUTH_DB);
+    __createUsersTable();
+    __createPermissionsTable();
 }
 
 bool isRoot = false;
@@ -116,7 +143,7 @@ void *client(void *tmp) {
 
     User current;
 
-    // start receiving client's login credentials
+    // start of authentication
     valread = read(new_socket, buffer, STR_SIZE);
     if (strcmp(buffer, ROOT) == 0) {
         makeUser(&current, buffer, buffer);
@@ -146,6 +173,7 @@ void *client(void *tmp) {
         close(new_socket);
         return 0;
     }
+    // end of authentication
 
     char selectedDatabase[128];
 
@@ -178,6 +206,9 @@ void *client(void *tmp) {
                 }
                 createTable(selectedDatabase, commands[2], attr, attr_i);
                 printf("[Log] Table %s.%s has been created.", selectedDatabase, commands[2]);
+            }
+            else if (strcmp(commands[1], "USER") == 0) {
+                printf("%s\n%s\n", commands[2], commands[5]);
             }
         }
         else if(strcmp(commands[0], "USE") == 0) {
@@ -227,6 +258,8 @@ int main(int argc, char const *argv[]) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
+
+    prepareUserSchema();
 
     int total = 0;
     while(true) {
