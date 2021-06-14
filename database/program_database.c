@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <dirent.h>
 
 #define SIZE 50
 #define STR_SIZE 1024
@@ -164,6 +165,18 @@ void dbSendMessage(int *new_socket, char *message) {
     send(*new_socket, message, strlen(message), 0);
 }
 
+bool doesDatabaseExist(const char name[]) {
+    char buff[256];
+    sprintf(buff, "%s/%s", DB_PROG_NAME, name);
+    DIR *dir = opendir(buff);
+    if (dir) {
+        // Directory exists
+        closedir(dir);
+        return 1;
+    }
+    return 0;
+}
+
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
 
@@ -243,7 +256,11 @@ void *client(void *tmp) {
             }
         }
         else if(strcmp(commands[0], "USE") == 0) {
-            strcpy(selectedDatabase, commands[1]);
+            if (doesDatabaseExist(commands[1])) {
+                strcpy(selectedDatabase, commands[1]);
+                dbSendMessage(&new_socket, "Database selected.");
+            }
+            else dbSendMessage(&new_socket, "Error, database not found.");
         }
         else if (strcmp(commands[0], "INSERT") == 0) {
             if (strcmp(commands[1], "INTO") == 0) {
