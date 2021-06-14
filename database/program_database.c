@@ -263,10 +263,13 @@ void *client(void *tmp) {
 
         if (strcmp(commands[0], "CREATE") == 0) {
             if (strcmp(commands[1], "DATABASE") == 0) {
-                createDatabase(commands[2]);
-                strcpy(selectedDatabase, commands[2]);
-                printf("[Log] Database %s has been created.\n", commands[2]);
-                dbSendMessage(&new_socket, "Database created.\n");
+                if (doesDatabaseExist(commands[2])) {
+                    dbSendMessage(&new_socket, "Error, database with that name already exists.\n");
+                }
+                else {
+                    createDatabase(commands[2]);
+                    dbSendMessage(&new_socket, "Database created.\n");
+                }
             }
             else if (strcmp(commands[1], "TABLE") == 0) {
                 // CREATE TABLE name (name int, name int)
