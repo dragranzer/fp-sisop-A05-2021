@@ -145,6 +145,7 @@ void prepareUserSchema() {
     __createPermissionsTable();
 }
 
+// Buggy: Should be replaced soon
 bool isRoot = false;
 
 bool authenticateServerSide(User* user) {
@@ -157,6 +158,10 @@ bool authenticateServerSide(User* user) {
     }
 
     return false;
+}
+
+void dbSendMessage(int *new_socket, char *message) {
+    send(*new_socket, message, strlen(message), 0);
 }
 
 void *client(void *tmp) {
@@ -183,7 +188,7 @@ void *client(void *tmp) {
 
         strcpy(name, buffer);
         memset(buffer, 0, sizeof(buffer));
-        send(new_socket, "received", strlen("received"), 0);
+        dbSendMessage(&new_socket, "received");
         
         valread = read(new_socket, buffer, STR_SIZE);
         strcpy(pass, buffer);
