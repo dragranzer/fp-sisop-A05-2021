@@ -223,6 +223,7 @@ void *client(void *tmp) {
                 createDatabase(commands[2]);
                 strcpy(selectedDatabase, commands[2]);
                 printf("[Log] Database %s has been created.\n", commands[2]);
+                dbSendMessage(&new_socket, "Database created.");
             }
             else if (strcmp(commands[1], "TABLE") == 0) {
                 // CREATE TABLE name (name int, name int)
@@ -235,6 +236,7 @@ void *client(void *tmp) {
                 }
                 createTable(selectedDatabase, commands[2], attr, attr_i);
                 printf("[Log] Table %s.%s has been created.\n", selectedDatabase, commands[2]);
+                dbSendMessage(&new_socket, "Table created.");
             }
             else if (strcmp(commands[1], "USER") == 0) {
                 printf("%s\n%s\n", commands[2], commands[5]);

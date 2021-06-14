@@ -104,6 +104,11 @@ int main(int argc, char const *argv[]) {
         }
 
         memset(buffer, 0, sizeof(buffer));
+        read(sock, buffer, STR_SIZE);
+        if (strlen(buffer)) {
+            printf("%s\n", buffer);
+        }
+        memset(buffer, 0, sizeof(buffer));
     }
     
     return 0;
