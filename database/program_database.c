@@ -323,12 +323,14 @@ void *client(void *tmp) {
                 insertToTable(selectedDatabase, commands[2], attr, attr_i);
                 dbSendMessage(&new_socket, "Data inserted.\n");
             }
+            else dbSendMessage(&new_socket, "Usage: INSERT INTO [database name] (value1, value2, ...)\n");
         }
         else if (strcmp(commands[0], "SELECT") == 0) {
             if (strcmp(commands[1], "*") == 0) {
                 selectFromTable(&new_socket, selectedDatabase, commands[3]);
             }
         }
+        else dbSendMessage(&new_socket, "Command not found.\n");
 
         // printf("DEBUG Command:\n");
         // for (int i = 0; i < command_size; i++) {
