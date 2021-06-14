@@ -249,6 +249,7 @@ void *client(void *tmp) {
     // end of authentication
 
     char selectedDatabase[128];
+    selectedDatabase[0] = '\0';
     while (true) {
         valread = read(new_socket, buffer, STR_SIZE);
 
@@ -277,17 +278,20 @@ void *client(void *tmp) {
                 }
             }
             else if (strcmp(commands[1], "TABLE") == 0) {
-                // CREATE TABLE name (name int, name int)
-                char *attr[64];
-                int attr_i = 0;
-                int i = 0;
-                for (int i = 3; i < command_size; i += 2) {
-                    attr[attr_i++] = commands[i];
-                    printf("Selected %s\n", commands[i]);
+                if (selectedDatabase[0] == '\0') dbSendMessage(&new_socket, "No database is selected.\n");
+                else {
+                    // CREATE TABLE name (name int, name int)
+                    char *attr[64];
+                    int attr_i = 0;
+                    int i = 0;
+                    for (int i = 3; i < command_size; i += 2) {
+                        attr[attr_i++] = commands[i];
+                        printf("Selected %s\n", commands[i]);
+                    }
+                    createTable(selectedDatabase, commands[2], attr, attr_i);
+                    printf("[Log] Table %s.%s has been created.\n", selectedDatabase, commands[2]);
+                    dbSendMessage(&new_socket, "Table created.\n");
                 }
-                createTable(selectedDatabase, commands[2], attr, attr_i);
-                printf("[Log] Table %s.%s has been created.\n", selectedDatabase, commands[2]);
-                dbSendMessage(&new_socket, "Table created.\n");
             }
             else if (strcmp(commands[1], "USER") == 0) {
                 printf("%s\n%s\n", commands[2], commands[5]);
@@ -302,35 +306,41 @@ void *client(void *tmp) {
         }
         else if (strcmp(commands[0], "INSERT") == 0) {
             if (strcmp(commands[1], "INTO") == 0) {
-                /*
-                    This function is not robust yet.
-                    Please add validation for:
-                    1. When no data is written
-                        Ex: 
-                        * INSERT INTO user
-                        * INSERT INTO user ()
-                    2. When number of data is not the same as number of column that table has
-                        Ex:
-                        * CREATE TABLE user (name string, password string)
-                        * INSERT INTO user ('Sayu', '12346', 'Female')
-                            This command is invalid since user table has 2 columns.
-                */
-                char *attr[64];
-                int attr_i = 0;
-                for (int i = 3; i < command_size; i++) {
-                    attr[attr_i++] = commands[i];
+                if (selectedDatabase[0] == '\0') dbSendMessage(&new_socket, "No database is selected.\n");
+                else {
+                    /*
+                        This function is not robust yet.
+                        Please add validation for:
+                        1. When no data is written
+                            Ex: 
+                            * INSERT INTO user
+                            * INSERT INTO user ()
+                        2. When number of data is not the same as number of column that table has
+                            Ex:
+                            * CREATE TABLE user (name string, password string)
+                            * INSERT INTO user ('Sayu', '12346', 'Female')
+                                This command is invalid since user table has 2 columns.
+                    */
+                    char *attr[64];
+                    int attr_i = 0;
+                    for (int i = 3; i < command_size; i++) {
+                        attr[attr_i++] = commands[i];
+                    }
+                    if (attr_i) {
+                        insertToTable(selectedDatabase, commands[2], attr, attr_i);
+                        dbSendMessage(&new_socket, "Data inserted.\n");
+                    }
+                    else dbSendMessage(&new_socket, "No value is assigned.\n");
                 }
-                if (attr_i) {
-                    insertToTable(selectedDatabase, commands[2], attr, attr_i);
-                    dbSendMessage(&new_socket, "Data inserted.\n");
-                }
-                else dbSendMessage(&new_socket, "No value is assigned.\n");
             }
             else dbSendMessage(&new_socket, "Usage: INSERT INTO [database name] (value1, value2, ...)\n");
         }
         else if (strcmp(commands[0], "SELECT") == 0) {
-            if (strcmp(commands[1], "*") == 0) {
-                selectFromTable(&new_socket, selectedDatabase, commands[3]);
+            if (selectedDatabase[0] == '\0') dbSendMessage(&new_socket, "No database is selected.\n");
+            else {
+                if (strcmp(commands[1], "*") == 0) {
+                    selectFromTable(&new_socket, selectedDatabase, commands[3]);
+                }
             }
         }
         else dbSendMessage(&new_socket, "Command not found.\n");
