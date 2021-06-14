@@ -61,6 +61,17 @@ bool authenticateClientSide(int argc, char const *argv[]) {
     return true;
 }
 
+void *messageHandling(void *arg) {
+    char buffer[256];
+    while(1) {
+        read(*(int *)arg, buffer, STR_SIZE);
+        if (strlen(buffer)) {
+            printf("%s", buffer);
+        }
+        memset(buffer, 0, sizeof(buffer));
+    }
+}
+
 int main(int argc, char const *argv[]) {
     // Template socket client
     struct sockaddr_in address, \
@@ -93,6 +104,9 @@ int main(int argc, char const *argv[]) {
     char command[STR_SIZE];
 
     printf("type 'quit' to quit\n");
+
+    pthread_t messageHandler;
+    pthread_create(&messageHandler, NULL, &messageHandling, &sock);
 
     while (true) {
         scanf("%[^\n]s", buffer);

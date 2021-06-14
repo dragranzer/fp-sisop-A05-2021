@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <dirent.h>
 
 #define SIZE 50
 #define STR_SIZE 1024
@@ -66,6 +67,7 @@ bool isAlphanum(char c) {
     if (c >= 'A' && c <= 'Z') return 1;
     else if(c >= 'a' && c <= 'z') return 1;
     else if(c >= '0' && c <= '9') return 1;
+    else if (c == '*') return 1;
     return 0;
 }
 
@@ -164,6 +166,48 @@ void dbSendMessage(int *new_socket, char *message) {
     send(*new_socket, message, strlen(message), 0);
 }
 
+bool doesDatabaseExist(const char name[]) {
+    char buff[256];
+    sprintf(buff, "%s/%s", DB_PROG_NAME, name);
+    DIR *dir = opendir(buff);
+    if (dir) {
+        // Directory exists
+        closedir(dir);
+        return 1;
+    }
+    return 0;
+}
+
+void selectFromTable(int *sock, const char *db, const char *tb) {
+    char buff[256];
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    FILE *fptr = fopen(buff, "r");
+    if (!fptr) return;
+    char temp[256];
+    int temp_size = 0;
+    char ch;
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == '\n') {
+            if (temp_size) {
+                temp[temp_size++] = '\n';
+                temp[temp_size++] = '\0';
+                dbSendMessage(sock, temp);
+                temp_size = 0;
+            }
+        }
+        else {
+            temp[temp_size++] = ch;
+        }
+    }
+    if (temp_size) {
+        temp[temp_size++] = '\n';
+        temp[temp_size++] = '\0';
+        dbSendMessage(sock, temp);
+        temp_size = 0;
+    }
+    fclose(fptr);
+}
+
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
 
@@ -205,7 +249,6 @@ void *client(void *tmp) {
     // end of authentication
 
     char selectedDatabase[128];
-
     while (true) {
         valread = read(new_socket, buffer, STR_SIZE);
 
@@ -223,6 +266,7 @@ void *client(void *tmp) {
                 createDatabase(commands[2]);
                 strcpy(selectedDatabase, commands[2]);
                 printf("[Log] Database %s has been created.\n", commands[2]);
+                dbSendMessage(&new_socket, "Database created.\n");
             }
             else if (strcmp(commands[1], "TABLE") == 0) {
                 // CREATE TABLE name (name int, name int)
@@ -235,13 +279,18 @@ void *client(void *tmp) {
                 }
                 createTable(selectedDatabase, commands[2], attr, attr_i);
                 printf("[Log] Table %s.%s has been created.\n", selectedDatabase, commands[2]);
+                dbSendMessage(&new_socket, "Table created.\n");
             }
             else if (strcmp(commands[1], "USER") == 0) {
                 printf("%s\n%s\n", commands[2], commands[5]);
             }
         }
         else if(strcmp(commands[0], "USE") == 0) {
-            strcpy(selectedDatabase, commands[1]);
+            if (doesDatabaseExist(commands[1])) {
+                strcpy(selectedDatabase, commands[1]);
+                dbSendMessage(&new_socket, "Database selected.\n");
+            }
+            else dbSendMessage(&new_socket, "Error, database not found.\n");
         }
         else if (strcmp(commands[0], "INSERT") == 0) {
             if (strcmp(commands[1], "INTO") == 0) {
@@ -264,6 +313,12 @@ void *client(void *tmp) {
                     attr[attr_i++] = commands[i];
                 }
                 insertToTable(selectedDatabase, commands[2], attr, attr_i);
+                dbSendMessage(&new_socket, "Data inserted.\n");
+            }
+        }
+        else if (strcmp(commands[0], "SELECT") == 0) {
+            if (strcmp(commands[1], "*") == 0) {
+                selectFromTable(&new_socket, selectedDatabase, commands[3]);
             }
         }
 
