@@ -320,8 +320,11 @@ void *client(void *tmp) {
                 for (int i = 3; i < command_size; i++) {
                     attr[attr_i++] = commands[i];
                 }
-                insertToTable(selectedDatabase, commands[2], attr, attr_i);
-                dbSendMessage(&new_socket, "Data inserted.\n");
+                if (attr_i) {
+                    insertToTable(selectedDatabase, commands[2], attr, attr_i);
+                    dbSendMessage(&new_socket, "Data inserted.\n");
+                }
+                else dbSendMessage(&new_socket, "No value is assigned.\n");
             }
             else dbSendMessage(&new_socket, "Usage: INSERT INTO [database name] (value1, value2, ...)\n");
         }
