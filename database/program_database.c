@@ -263,12 +263,17 @@ void *client(void *tmp) {
 
         if (strcmp(commands[0], "CREATE") == 0) {
             if (strcmp(commands[1], "DATABASE") == 0) {
-                if (doesDatabaseExist(commands[2])) {
-                    dbSendMessage(&new_socket, "Error, database with that name already exists.\n");
+                if (strlen(commands[2])) {
+                    if (doesDatabaseExist(commands[2])) {
+                        dbSendMessage(&new_socket, "Error, database with that name already exists.\n");
+                    }
+                    else {
+                        createDatabase(commands[2]);
+                        dbSendMessage(&new_socket, "Database created.\n");
+                    }
                 }
                 else {
-                    createDatabase(commands[2]);
-                    dbSendMessage(&new_socket, "Database created.\n");
+                    dbSendMessage(&new_socket, "Usage: CREATE DATABASE [database name]\n");
                 }
             }
             else if (strcmp(commands[1], "TABLE") == 0) {
