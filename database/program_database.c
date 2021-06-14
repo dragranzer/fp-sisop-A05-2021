@@ -218,7 +218,6 @@ void *client(void *tmp) {
     // end of authentication
 
     char selectedDatabase[128];
-
     while (true) {
         valread = read(new_socket, buffer, STR_SIZE);
 
@@ -283,6 +282,7 @@ void *client(void *tmp) {
                     attr[attr_i++] = commands[i];
                 }
                 insertToTable(selectedDatabase, commands[2], attr, attr_i);
+                dbSendMessage(&new_socket, "Data inserted.");
             }
         }
 
