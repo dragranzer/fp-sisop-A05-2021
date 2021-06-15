@@ -176,11 +176,10 @@ void __createUsersTable() {
 
 void __createPermissionsTable() {
     char *attr[64];
-    attr[0] = "db_name";
-    attr[1] = "tb_name";
-    attr[2] = "us_name";
+    attr[0] = "database";
+    attr[1] = "user";
     if (!doesTableExist(AUTH_DB, PERM_TABLE)) {
-        createTable(AUTH_DB, PERM_TABLE, attr, 3);
+        createTable(AUTH_DB, PERM_TABLE, attr, 2);
     }
 }
 
@@ -532,6 +531,85 @@ int deleteFromTable(char *db, char *tb, char col[], char val[]) {
     return aff_row;
 }
 
+void grantPermission(char *db, char *us) {
+    char *attr[64];
+    attr[0] = db;
+    attr[1] = us;
+    insertToTable(AUTH_DB, PERM_TABLE, attr, 2);
+}
+
+void __hasPermissionToDBHelper(char *line, char *db_r, char *us_r) {
+    char d[SIZE];
+    char u[SIZE];
+
+    int i = 0;
+    int j = 0;
+    while (line[i] != ',') {
+        d[j++] = line[i++];
+    }
+    d[j++] = '\0';
+    i++;
+    strcpy(db_r, d);
+
+    j = 0;
+    while (line[i] != ',') {
+        u[j++] = line[i++];
+    }
+    u[j++] = '\0';
+    strcpy(us_r, u);
+}
+
+bool hasPermissionToDB(char *name, char *db) {
+    char filePath[256];
+    sprintf(filePath, "%s/%s/%s.nya", DB_PROG_NAME, AUTH_DB, PERM_TABLE);
+    FILE *f = fopen(filePath, "r");
+
+    if (!f) {
+        printf("error opening file");
+        return false;
+    }
+    User attempt;
+    char temp[256];
+    int temp_size = 0;
+    char ch;
+
+    char db_read[SIZE];
+    char us_read[SIZE];
+
+    while (fscanf(f, "%c", &ch) != EOF) {
+        if (ch == '\n') {
+            if (temp_size) {
+                temp[temp_size++] = '\n';
+                temp[temp_size++] = '\0';
+                __hasPermissionToDBHelper(temp, db_read, us_read);
+
+                if (strcmp(db_read, db) == 0 && strcmp(us_read, name) == 0) {
+                    return true;
+                }
+
+                temp_size = 0;
+            }
+        }
+        else {
+            temp[temp_size++] = ch;
+        }
+    }
+    if (temp_size) {
+        temp[temp_size++] = '\n';
+        temp[temp_size++] = '\0';
+        __hasPermissionToDBHelper(temp, db_read, us_read);
+
+        if (strcmp(db_read, db) == 0 && strcmp(us_read, name) == 0) {
+            return true;
+        }
+
+        temp_size = 0;
+    }
+    fclose(f);
+
+    return false;
+}
+
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
 
@@ -594,6 +672,7 @@ void *client(void *tmp) {
                     }
                     else {
                         createDatabase(commands[2]);
+                        grantPermission(commands[2], current.name);
                         dbSendMessage(&new_socket, "Database created.\n");
                     }
                 }
@@ -633,11 +712,19 @@ void *client(void *tmp) {
                     }
                 }
             }
+            else {
+                dbSendMessage(&new_socket, "Syntax Error: CREATE [What to create]");
+            }
         }
         else if(strcmp(commands[0], "USE") == 0) {
-            if (doesDatabaseExist(commands[1])) {
-                strcpy(selectedDatabase, commands[1]);
-                dbSendMessage(&new_socket, "Database selected.\n");
+            if (doesDatabaseExist(commands[1]) && command_size == 2) {
+                if (hasPermissionToDB(current.name, commands[1])) {
+                    strcpy(selectedDatabase, commands[1]);
+                    dbSendMessage(&new_socket, "Database selected.\n");
+                }
+                else {
+                    dbSendMessage(&new_socket, PERM_ERROR);
+                }
             }
             else dbSendMessage(&new_socket, "Error, database not found.\n");
         }
@@ -755,6 +842,22 @@ void *client(void *tmp) {
                 }
             }
             else dbSendMessage(&new_socket, "Syntax error: DELETE FROM [table name]\n");
+        }
+        else if (strcmp(commands[0], "GRANT") ==0) {
+            if (command_size != 5) {
+                dbSendMessage(&new_socket, "Syntax Error: GRANT PERMISSION [Database Name] INTO [User name]\n");
+            }
+            else {
+                if (!current.isRoot) {
+                    dbSendMessage(&new_socket, PERM_ERROR);
+                }
+                else if (current.isRoot) {
+                    grantPermission(commands[2], commands[4]);
+                    char success[STR_SIZE];
+                    sprintf(success, "Granted %s permission to database %s\n", commands[4], commands[2]);
+                    dbSendMessage(&new_socket, success);
+                }
+            }
         }
         else dbSendMessage(&new_socket, "Command not found.\n");
 
