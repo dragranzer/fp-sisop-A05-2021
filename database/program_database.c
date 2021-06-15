@@ -17,6 +17,9 @@
 #define N_OF_CONNECTION 5
 #define MAX_COMMANDS 128
 #define MAX_COMMAND_LENGTH 64
+#define MAX_COLUMN 128
+#define MAX_COLUMN_LEN 64
+#define MAX_TABLE_LEN 64
 
 static char *AUTH_ERROR = "Authentication error.\nClosing connection...\n";
 static char *PERM_ERROR = "You have no permission to run that command.\n";
@@ -216,6 +219,75 @@ void selectFromTable(int *sock, const char *db, const char *tb) {
     fclose(fptr);
 }
 
+bool isStringInCol(char s1[MAX_COLUMN_LEN], const char arr[MAX_COLUMN][MAX_COLUMN_LEN], int arr_size) {
+    for (int i = 0; i < arr_size; i++) {
+        if (strcmp(s1, arr[i]) == 0) return 1;
+    }
+    return 0;
+}
+
+void selectFromTable2(int *sock, const char *db, const char *tb, const char col[MAX_COLUMN][MAX_COLUMN_LEN], int col_size) {
+    char buff[256];
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    FILE *fptr = fopen(buff, "r");
+    if (!fptr) return;
+    char printable[1024];
+    char tb_col[MAX_COLUMN_LEN];
+    char tb_col_size = 0;
+    bool tb_col_reserved[MAX_COLUMN];
+    memset(tb_col_reserved, 0, sizeof(tb_col_reserved));
+    int tb_col_number = 0;
+    char ch;
+    // Reading header
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            if (isStringInCol(tb_col, col, col_size)) {
+                tb_col_reserved[tb_col_number] = 1;
+                sprintf(printable, "%s%16s ", printable, tb_col);
+            }
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+            tb_col_number++;
+        }
+        else if (ch == '\n') {
+            // New line is detected
+            strcat(printable, "\n");
+            break;
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+        }
+    }
+    dbSendMessage(sock, printable);
+    tb_col_number = 0;
+    printable[0] = '\0';
+    // Reading content
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            if (tb_col_reserved[tb_col_number++]) {
+                sprintf(printable, "%s%16s ", printable, tb_col);
+            }
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+        }
+        else if (ch == '\n') {
+            // New line
+            tb_col_number = 0;
+            strcat(printable, "\n");
+            dbSendMessage(sock, printable);
+            printable[0] = '\0';
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+        }
+    }
+    strcat(printable, "\n");
+    dbSendMessage(sock, printable);
+    fclose(fptr);
+}
+
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
 
@@ -361,6 +433,37 @@ void *client(void *tmp) {
             else {
                 if (strcmp(commands[1], "*") == 0) {
                     selectFromTable(&new_socket, selectedDatabase, commands[3]);
+                }
+                else {
+                    // Stores columns that will be selected
+                    char col[MAX_COLUMN][MAX_COLUMN_LEN];
+                    int col_size = 0;
+                    // Stores table name
+                    char tb[MAX_TABLE_LEN];
+                    // Incremental value
+                    int i = 1;
+                    bool isValid = false;
+                    while(i < command_size) {
+                        if (strcmp(commands[i], "FROM") == 0) {
+                            // After string "FROM", there must be followed by table name
+                            if (i + 1 < command_size) {
+                                strcpy(tb, commands[i+1]);
+                                isValid = true;
+                            }
+                            // Exit while scope
+                            i = command_size;
+                        }
+                        else {
+                            strcpy(col[col_size++], commands[i]);
+                            i++;
+                        }
+                    }
+                    if (!isValid) {
+                        dbSendMessage(&new_socket, "Syntax error: SELECT [col1, col2 | *] FROM [table]\n");
+                    }
+                    else {
+                        selectFromTable2(&new_socket, selectedDatabase, tb, col, col_size);
+                    }
                 }
             }
         }
