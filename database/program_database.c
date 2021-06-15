@@ -231,7 +231,7 @@ void selectFromTable2(int *sock, const char *db, const char *tb, const char col[
     sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
     FILE *fptr = fopen(buff, "r");
     if (!fptr) return;
-    char printable[1024];
+    char printable[STR_SIZE];
     char tb_col[MAX_COLUMN_LEN];
     char tb_col_size = 0;
     bool tb_col_reserved[MAX_COLUMN];
@@ -253,15 +253,16 @@ void selectFromTable2(int *sock, const char *db, const char *tb, const char col[
         else if (ch == '\n') {
             // New line is detected
             strcat(printable, "\n");
+            dbSendMessage(sock, printable);
+            printf("%s", printable);
             break;
         }
         else {
             tb_col[tb_col_size++] = ch;
         }
     }
-    dbSendMessage(sock, printable);
     tb_col_number = 0;
-    printable[0] = '\0';
+    memset(printable, 0, sizeof(printable));
     // Reading content
     while (fscanf(fptr, "%c", &ch) != EOF) {
         if (ch == ',') {
@@ -277,7 +278,8 @@ void selectFromTable2(int *sock, const char *db, const char *tb, const char col[
             tb_col_number = 0;
             strcat(printable, "\n");
             dbSendMessage(sock, printable);
-            printable[0] = '\0';
+            printf("%s", printable);
+            memset(printable, 0, sizeof(printable));
         }
         else {
             tb_col[tb_col_size++] = ch;
@@ -285,6 +287,8 @@ void selectFromTable2(int *sock, const char *db, const char *tb, const char col[
     }
     strcat(printable, "\n");
     dbSendMessage(sock, printable);
+    printf("%s", printable);
+    memset(printable, 0, sizeof(printable));
     fclose(fptr);
 }
 
@@ -462,6 +466,8 @@ void *client(void *tmp) {
                         dbSendMessage(&new_socket, "Syntax error: SELECT [col1, col2 | *] FROM [table]\n");
                     }
                     else {
+                        printf("col\n");
+                        for (int i = 0; i < col_size; i++) printf("%d. `%s`\n", i, col[i]);
                         selectFromTable2(&new_socket, selectedDatabase, tb, col, col_size);
                     }
                 }
