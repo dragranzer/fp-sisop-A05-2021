@@ -21,6 +21,12 @@
 #define MAX_COLUMN_LEN 64
 #define MAX_TABLE_LEN 64
 
+// const for currTime string
+static const int TIME_SIZE = 30;
+// const for log string size
+static const int LOG_SIZE = 1000;
+
+static char *logpath = "database.log";
 static char *AUTH_ERROR = "Authentication error.\nClosing connection...\n";
 static char *PERM_ERROR = "You have no permission to run that command.\n";
 static char *CMMD_ERROR = "Error while parsing command.\nPlease make sure the command syntax.\n";
@@ -626,6 +632,21 @@ void dropTable(char *db, char *tb) {
     }
 }
 
+void logging(User *user, char *command) {
+    time_t t = time(NULL);
+    struct tm* lt = localtime(&t);
+
+    char currTime[TIME_SIZE];
+    strftime(currTime, TIME_SIZE, "%Y-%m-%d %H:%M:%S", lt);
+
+    char log[LOG_SIZE];
+    sprintf(log, "%s:%s:%s", currTime, user->name, command);
+
+    FILE *out = fopen(logpath, "a");
+    fprintf(out, "%s\n", log);
+    fclose(out);
+}
+
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
 
@@ -690,10 +711,11 @@ void *client(void *tmp) {
                         createDatabase(commands[2]);
                         grantPermission(commands[2], current.name);
                         dbSendMessage(&new_socket, "Database created.\n");
+                        logging(&current, buffer);
                     }
                 }
                 else {
-                    dbSendMessage(&new_socket, "Usage: CREATE DATABASE [database name]\n");
+                    dbSendMessage(&new_socket, "Syntax Error: CREATE DATABASE [database name]\n");
                 }
             }
             else if (strcmp(commands[1], "TABLE") == 0) {
