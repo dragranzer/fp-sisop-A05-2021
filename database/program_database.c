@@ -610,6 +610,22 @@ bool hasPermissionToDB(char *name, char *db) {
     return false;
 }
 
+void dropDatabase(char *db) {
+
+}
+
+void dropTable(char *db, char *tb) {
+    char filePath[SIZE];
+    sprintf(filePath, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+
+    if (remove(filePath) == 0) {
+        printf("[Log] Table %s.%s has ben dropped.\n", db, tb);
+    }
+    else {
+        printf("failed to drop table.");
+    }
+}
+
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
 
@@ -843,7 +859,7 @@ void *client(void *tmp) {
             }
             else dbSendMessage(&new_socket, "Syntax error: DELETE FROM [table name]\n");
         }
-        else if (strcmp(commands[0], "GRANT") ==0) {
+        else if (strcmp(commands[0], "GRANT") == 0) {
             if (command_size != 5) {
                 dbSendMessage(&new_socket, "Syntax Error: GRANT PERMISSION [Database Name] INTO [User name]\n");
             }
@@ -857,6 +873,26 @@ void *client(void *tmp) {
                     sprintf(success, "Granted %s permission to database %s\n", commands[4], commands[2]);
                     dbSendMessage(&new_socket, success);
                 }
+            }
+        }
+        else if (strcmp(commands[0], "DROP") == 0) {
+            if (command_size > 2) {
+                if (strcmp(commands[1], "DATABASE") == 0) {
+                    dropDatabase(commands[2]);
+                }
+                else if (strcmp(commands[1], "TABLE") == 0) {
+                    if (doesTableExist(selectedDatabase, commands[2])) {
+                        dropTable(selectedDatabase, commands[2]);
+                    }
+                }
+                else if (strcmp(commands[1], "COLUMN") == 0) {
+                    if (command_size != 5) {
+                        dbSendMessage(&new_socket, "Syntax Error: DROP COLUMN [column_name] FROM [table_name]\n");
+                    }
+                }
+            }
+            else {
+                dbSendMessage(&new_socket, "Syntax Error on DROP query\n");
             }
         }
         else dbSendMessage(&new_socket, "Command not found.\n");
