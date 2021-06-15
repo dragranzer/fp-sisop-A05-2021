@@ -71,6 +71,7 @@ bool isAlphanum(char c) {
     else if(c >= 'a' && c <= 'z') return 1;
     else if(c >= '0' && c <= '9') return 1;
     else if (c == '*') return 1;
+    else if (c == '=') return 1;
     return 0;
 }
 
@@ -376,6 +377,73 @@ void selectFromTable2(int *sock, const char *db, const char *tb, const char col[
     fclose(fptr);
 }
 
+int updateInTable(int *sock, const char *db, const char *tb, char col[MAX_COLUMN_LEN], char val[]) {
+    char buff[256];
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    char buff2[256];
+    sprintf(buff2, "%s/%s/%s_new.nya", DB_PROG_NAME, db, tb);
+    FILE *fptr = fopen(buff, "r");
+    if (!fptr) return 0;
+    FILE *fptr2 = fopen(buff2, "w");
+    if (!fptr2) return 0;
+    char tb_col[MAX_COLUMN_LEN];
+    int tb_col_size = 0;
+    int set_col_id = 0;
+    int tb_col_number = 0;
+    char ch;
+    // Reading header
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            if (strcmp(tb_col, col) == 0) {
+                set_col_id = tb_col_number;
+            }
+            fprintf(fptr2, "%s,", tb_col);
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+            tb_col_number++;
+        }
+        else if (ch == '\n') {
+            // New line is detected
+            fprintf(fptr2, "\n");
+            break;
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+        }
+    }
+    tb_col_number = 0;
+    // Reading content
+    int aff_row = 0;
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            if ((tb_col_number++) == set_col_id) {
+                fprintf(fptr2, "%s,", val);
+                aff_row++;
+            }
+            else {
+                fprintf(fptr2, "%s,", tb_col);
+            }
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+        }
+        else if (ch == '\n') {
+            // New line
+            tb_col_number = 0;
+            fprintf(fptr2, "\n");
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+        }
+    }
+    fclose(fptr2);
+    fclose(fptr);
+    remove(buff);
+    rename(buff2, buff);
+    return aff_row;
+}
+
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
 
@@ -531,6 +599,7 @@ void *client(void *tmp) {
                     // Incremental value
                     int i = 1;
                     bool isValid = false;
+                    bool withWhere = false;
                     while(i < command_size) {
                         if (strcmp(commands[i], "FROM") == 0) {
                             // After string "FROM", there must be followed by table name
@@ -556,6 +625,21 @@ void *client(void *tmp) {
                     }
                 }
             }
+        }
+        else if (strcmp(commands[0], "UPDATE") == 0) {
+            if (doesTableExist(selectedDatabase, commands[1])) {
+                if (strcmp(commands[2], "SET") == 0) {
+                    if (command_size == 6 && strcmp(commands[4], "=") == 0) {
+                        int affected_row = updateInTable(&new_socket, selectedDatabase, commands[1], commands[3], commands[5]);
+                        char buff[128];
+                        sprintf(buff, "%d rows affected.\n", affected_row);
+                        dbSendMessage(&new_socket, buff);
+                    }
+                    else dbSendMessage(&new_socket, "Syntax error: UPDATE [table name] SET [col] = [value]\n");
+                }
+                else dbSendMessage(&new_socket, "Syntax error: UPDATE [table name] SET [col] = [value]\n");
+            }
+            else dbSendMessage(&new_socket, "Table not found.\n");
         }
         else dbSendMessage(&new_socket, "Command not found.\n");
 
