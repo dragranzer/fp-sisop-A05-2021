@@ -18,9 +18,11 @@
 #define MAX_COMMANDS 128
 #define MAX_COMMAND_LENGTH 64
 
-static const char *AUTH_ERROR = "Authentication error.\nClosing connection...\n";
-static const char *ROOT = "root";
-static const char *ERROR = "error";
+static char *AUTH_ERROR = "Authentication error.\nClosing connection...\n";
+static char *PERM_ERROR = "You have no permission to run that command.\n";
+static char *CMMD_ERROR = "Error while parsing command.\nPlease make sure the command syntax.\n";
+static char *ROOT = "root";
+static char *ERROR = "error";
 static char *DB_PROG_NAME = "databaseku";
 
 /*
@@ -50,6 +52,7 @@ pthread_t tid[3000];
 typedef struct user_t {
     char name[SIZE];
     char pass[SIZE];
+    bool isRoot;
 } User;
 
 void makeUser(User* user, char *name, char *pass) {
@@ -130,6 +133,13 @@ void insertToTable(char *db, char *tb, char *attr_data[64], int size) {
     printf(")\n");
 }
 
+void createUser(char *u, char *p) {
+    char *attr[64];
+    attr[0] = u;
+    attr[1] = p;
+    insertToTable(AUTH_DB, USER_TABLE, attr, 2);
+}
+
 void __createUsersTable() {
     char *attr[64];
     attr[0] = "name";
@@ -141,21 +151,19 @@ void __createPermissionsTable() {
 
 }
 
-void prepareUserSchema() {
+void prepareAuthSchema() {
     createDatabase(AUTH_DB);
     __createUsersTable();
     __createPermissionsTable();
 }
 
-// Buggy: Should be replaced soon
-bool isRoot = false;
-
 bool authenticateServerSide(User* user) {
     if (strcmp(user->name, ROOT) == 0) {
-        isRoot = true;
+        user->isRoot = true;
         return true;
     }
     else if (strcmp(user->name, NAME) == 0 && strcmp(user->pass, PASS) == 0) {
+        user->isRoot = false;
         return true;
     }
 
@@ -294,7 +302,20 @@ void *client(void *tmp) {
                 }
             }
             else if (strcmp(commands[1], "USER") == 0) {
-                printf("%s\n%s\n", commands[2], commands[5]);
+                if (!current.isRoot) {
+                    dbSendMessage(&new_socket, PERM_ERROR);
+                }
+                else if (current.isRoot) {
+                    if (command_size != 6) {
+                        dbSendMessage(&new_socket, CMMD_ERROR);
+                    }
+                    else {
+                        createUser(commands[2], commands[5]);
+                        char success[STR_SIZE];
+                        sprintf(success, "Successfully created user %s\n", commands[2]);
+                        dbSendMessage(&new_socket, success);
+                    }
+                }
             }
         }
         else if(strcmp(commands[0], "USE") == 0) {
@@ -350,9 +371,9 @@ void *client(void *tmp) {
         //     printf("%d. `%s`\n", i, commands[i]);
         // }
 
-        if (strlen(buffer)) {
-            printf("message: %s\n", buffer);
-        }
+        // if (strlen(buffer)) {
+        //     printf("message: %s\n", buffer);
+        // }
 
         memset(buffer, 0, sizeof(buffer));
     }
@@ -394,7 +415,7 @@ int main(int argc, char const *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    prepareUserSchema();
+    prepareAuthSchema();
 
     int total = 0;
     while(true) {
