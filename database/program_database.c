@@ -444,6 +444,94 @@ int updateInTable(int *sock, const char *db, const char *tb, char col[MAX_COLUMN
     return aff_row;
 }
 
+int deleteFromTable(char *db, char *tb, char col[], char val[]) {
+    char buff[256];
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    char buff2[256];
+    sprintf(buff2, "%s/%s/%s_new.nya", DB_PROG_NAME, db, tb);
+    FILE *fptr = fopen(buff, "r");
+    if (!fptr) return 0;
+    FILE *fptr2 = fopen(buff2, "w");
+    if (!fptr2) return 0;
+    char tb_col[MAX_COLUMN_LEN];
+    int tb_col_size = 0;
+    int set_col_id = 0;
+    int tb_col_number = 0;
+    char ch;
+    bool useWhere = true;
+    if (strcmp(col, "$") == 0) useWhere = false;
+    // Reading header
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            if (useWhere && strcmp(tb_col, col) == 0) {
+                set_col_id = tb_col_number;
+            }
+            fprintf(fptr2, "%s,", tb_col);
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+            tb_col_number++;
+        }
+        else if (ch == '\n') {
+            // New line is detected
+            fprintf(fptr2, "\n");
+            break;
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+        }
+    }
+    tb_col_number = 0;
+    // Reading content
+    int aff_row = 0;
+    char printable[1024];
+    memset(printable, 0, sizeof(printable));
+    bool isDeleted = false;
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            if (!useWhere) {
+                isDeleted = 1;
+                if ((tb_col_number++) == set_col_id)
+                    aff_row++;
+            }
+            else {
+                if ((tb_col_number++) == set_col_id && strcmp(tb_col, val) == 0) {
+                    isDeleted = 1;
+                    aff_row++;
+                }
+            }
+            sprintf(printable, "%s%s,", printable, tb_col);
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+        }
+        else if (ch == '\n') {
+            // New line
+            tb_col_number = 0;
+            strcat(printable, "\n");
+            if (!isDeleted) {
+                fprintf(fptr2, "%s", printable);
+            }
+            memset(printable, 0, sizeof(printable));
+            isDeleted = 0;
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+        }
+    }
+    strcat(printable, "\n");
+    if (!isDeleted) {
+        fprintf(fptr2, "%s", printable);
+    }
+    memset(printable, 0, sizeof(printable));
+    isDeleted = 0;
+    fclose(fptr2);
+    fclose(fptr);
+    remove(buff);
+    rename(buff2, buff);
+    return aff_row;
+}
+
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
 
@@ -640,6 +728,33 @@ void *client(void *tmp) {
                 else dbSendMessage(&new_socket, "Syntax error: UPDATE [table name] SET [col] = [value]\n");
             }
             else dbSendMessage(&new_socket, "Table not found.\n");
+        }
+        else if (strcmp(commands[0], "DELETE") == 0) {
+            if (strcmp(commands[1], "FROM") == 0) {
+                if (selectedDatabase[0] == '\0') dbSendMessage(&new_socket, "No database is selected.\n");
+                else {
+                    if (doesTableExist(selectedDatabase, commands[2])) {
+                        if (command_size == 7 && strcmp(commands[3], "WHERE") == 0 && strcmp(commands[5], "=") == 0) {
+                            // Delete with WHERE
+                            int affected_row = deleteFromTable(selectedDatabase, commands[2], commands[4], commands[6]);
+                            char buff[128];
+                            sprintf(buff, "%d affected row.\n", affected_row);
+                            dbSendMessage(&new_socket, buff);
+                        }
+                        else {
+                            // Delete without where
+                            int affected_row = deleteFromTable(selectedDatabase, commands[2], "$", "$");
+                            char buff[128];
+                            sprintf(buff, "%d affected row.\n", affected_row);
+                            dbSendMessage(&new_socket, buff);
+                        }
+                    }
+                    else {
+                        dbSendMessage(&new_socket, "Table not exist.\n");
+                    }
+                }
+            }
+            else dbSendMessage(&new_socket, "Syntax error: DELETE FROM [table name]\n");
         }
         else dbSendMessage(&new_socket, "Command not found.\n");
 
