@@ -66,6 +66,10 @@ void printUser(User* user) {
     return;
 }
 
+bool equalUser(User *a, User *b) {
+    return (strcmp(a->name, b->name) == 0 && strcmp(a->pass, b->pass) == 0);
+}
+
 bool isAlphanum(char c) {
     if (c >= 'A' && c <= 'Z') return 1;
     else if(c >= 'a' && c <= 'z') return 1;
@@ -133,6 +137,30 @@ void insertToTable(char *db, char *tb, char *attr_data[64], int size) {
     printf(")\n");
 }
 
+bool doesDatabaseExist(const char name[]) {
+    char buff[256];
+    sprintf(buff, "%s/%s", DB_PROG_NAME, name);
+    DIR *dir = opendir(buff);
+    if (dir) {
+        // Directory exists
+        closedir(dir);
+        return 1;
+    }
+    return 0;
+}
+
+bool doesTableExist(char *db, char *tb) {
+    char filePath[256];
+    sprintf(filePath, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    FILE *f = fopen(filePath, "r");
+    if (f) {
+        // table exists
+        fclose(f);
+        return 1;
+    }
+    return 0;
+}
+
 void createUser(char *u, char *p) {
     char *attr[64];
     attr[0] = u;
@@ -144,17 +172,92 @@ void __createUsersTable() {
     char *attr[64];
     attr[0] = "name";
     attr[1] = "pass";
-    createTable(AUTH_DB, USER_TABLE, attr, 2);
+    if (!doesTableExist(AUTH_DB, USER_TABLE)) {
+        createTable(AUTH_DB, USER_TABLE, attr, 2);
+    }
 }
 
 void __createPermissionsTable() {
-
+    char *attr[64];
+    attr[0] = "db_name";
+    attr[1] = "tb_name";
+    attr[2] = "us_name";
+    if (!doesTableExist(AUTH_DB, PERM_TABLE)) {
+        createTable(AUTH_DB, PERM_TABLE, attr, 3);
+    }
 }
 
 void prepareAuthSchema() {
-    createDatabase(AUTH_DB);
+    if (!doesDatabaseExist(AUTH_DB)) {
+        createDatabase(AUTH_DB);
+    }
     __createUsersTable();
     __createPermissionsTable();
+}
+
+void __readUserTable(User *user, char *line) {
+    char u[SIZE];
+    char p[SIZE];
+
+    int i = 0;
+    int j = 0;
+    while (line[i] != ',') {
+        u[j++] = line[i++];
+    }
+    u[j++] = '\0';
+    i++;
+    strcpy(user->name, u);
+
+    j = 0;
+    while (line[i] != ',') {
+        p[j++] = line[i++];
+    }
+    p[j++] = '\0';
+    strcpy(user->pass, p);
+}
+
+bool __authenticateServerSideHelper(User *user) {
+    char filePath[256];
+    sprintf(filePath, "%s/%s/%s.nya", DB_PROG_NAME, AUTH_DB, USER_TABLE);
+    FILE *f = fopen(filePath, "r");
+
+    if (!f) {
+        printf("error opening file");
+        return false;
+    }
+    User attempt;
+    char temp[256];
+    int temp_size = 0;
+    char ch;
+    while (fscanf(f, "%c", &ch) != EOF) {
+        if (ch == '\n') {
+            if (temp_size) {
+                temp[temp_size++] = '\n';
+                temp[temp_size++] = '\0';
+                __readUserTable(&attempt, temp);
+                if (equalUser(user, &attempt)) {
+                    return true;
+                }
+
+                temp_size = 0;
+            }
+        }
+        else {
+            temp[temp_size++] = ch;
+        }
+    }
+    if (temp_size) {
+        temp[temp_size++] = '\n';
+        temp[temp_size++] = '\0';
+        __readUserTable(&attempt, temp);
+        if (equalUser(user, &attempt)) {
+            return true;
+        }
+        temp_size = 0;
+    }
+    fclose(f);
+
+    return false;
 }
 
 bool authenticateServerSide(User* user) {
@@ -162,7 +265,7 @@ bool authenticateServerSide(User* user) {
         user->isRoot = true;
         return true;
     }
-    else if (strcmp(user->name, NAME) == 0 && strcmp(user->pass, PASS) == 0) {
+    else if (__authenticateServerSideHelper(user)) {
         user->isRoot = false;
         return true;
     }
@@ -172,18 +275,6 @@ bool authenticateServerSide(User* user) {
 
 void dbSendMessage(int *new_socket, char *message) {
     send(*new_socket, message, strlen(message), 0);
-}
-
-bool doesDatabaseExist(const char name[]) {
-    char buff[256];
-    sprintf(buff, "%s/%s", DB_PROG_NAME, name);
-    DIR *dir = opendir(buff);
-    if (dir) {
-        // Directory exists
-        closedir(dir);
-        return 1;
-    }
-    return 0;
 }
 
 void selectFromTable(int *sock, const char *db, const char *tb) {
