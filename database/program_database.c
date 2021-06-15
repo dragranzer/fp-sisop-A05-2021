@@ -33,13 +33,6 @@ static char *AUTH_DB = "auth";
 static char *USER_TABLE = "users";
 static char *PERM_TABLE = "permissions";
 
-/*
-    A temporary stored user creds
-    Will be soon deprecated
-*/
-static const char *NAME = "haha";
-static const char *PASS = "hihi";
-
 pthread_t tid[3000];
 
 /*
