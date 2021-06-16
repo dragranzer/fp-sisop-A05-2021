@@ -957,6 +957,7 @@ void *client(void *tmp) {
         // }
 
         memset(buffer, 0, sizeof(buffer));
+        memset(commands, 0, sizeof(commands));
     }
 }
 
