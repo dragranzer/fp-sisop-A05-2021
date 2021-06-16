@@ -815,8 +815,13 @@ void *client(void *tmp) {
             if (selectedDatabase[0] == '\0') dbSendMessage(&new_socket, "No database is selected.\n");
             else {
                 if (strcmp(commands[1], "*") == 0) {
-                    selectFromTable(&new_socket, selectedDatabase, commands[3]);
-                    logging(&current, buffer);
+                    //SELECT * FROM [table] have 4 commands
+                    if(command_size == 4){
+                        selectFromTable(&new_socket, selectedDatabase, commands[3]);
+                        logging(&current, buffer);
+                    }else{
+                        dbSendMessage(&new_socket, "Syntax error: SELECT [col1, col2 | *] FROM [table]\n");
+                    }
                 }
                 else {
                     // Stores columns that will be selected
