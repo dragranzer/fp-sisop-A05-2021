@@ -566,6 +566,11 @@ void __hasPermissionToDBHelper(char *line, char *db_r, char *us_r) {
 }
 
 bool hasPermissionToDB(char *name, char *db) {
+
+    if (strcmp(name, ROOT) == 0) {
+        return true;
+    }
+
     char filePath[256];
     sprintf(filePath, "%s/%s/%s.nya", DB_PROG_NAME, AUTH_DB, PERM_TABLE);
     FILE *f = fopen(filePath, "r");
@@ -729,10 +734,16 @@ void *client(void *tmp) {
                         attr[attr_i++] = commands[i];
                         printf("Selected %s\n", commands[i]);
                     }
-                    createTable(selectedDatabase, commands[2], attr, attr_i);
-                    printf("[Log] Table %s.%s has been created.\n", selectedDatabase, commands[2]);
-                    dbSendMessage(&new_socket, "Table created.\n");
-                }
+
+                    if (!doesTableExist(selectedDatabase, commands[2])) {
+                        createTable(selectedDatabase, commands[2], attr, attr_i);
+                        logging(&current, buffer);
+                        dbSendMessage(&new_socket, "Table created.\n");
+                    }
+                    else {
+                        dbSendMessage(&new_socket, "Sorry, a table with that name was already created in this database.\n");
+                    }
+                }   
             }
             else if (strcmp(commands[1], "USER") == 0) {
                 if (!current.isRoot) {
@@ -746,6 +757,7 @@ void *client(void *tmp) {
                         createUser(commands[2], commands[5]);
                         char success[STR_SIZE];
                         sprintf(success, "Successfully created user %s\n", commands[2]);
+                        logging(&current, buffer);
                         dbSendMessage(&new_socket, success);
                     }
                 }
@@ -758,6 +770,7 @@ void *client(void *tmp) {
             if (doesDatabaseExist(commands[1]) && command_size == 2) {
                 if (hasPermissionToDB(current.name, commands[1])) {
                     strcpy(selectedDatabase, commands[1]);
+                    logging(&current, buffer);
                     dbSendMessage(&new_socket, "Database selected.\n");
                 }
                 else {
@@ -790,6 +803,7 @@ void *client(void *tmp) {
                     }
                     if (attr_i) {
                         insertToTable(selectedDatabase, commands[2], attr, attr_i);
+                        logging(&current, buffer);
                         dbSendMessage(&new_socket, "Data inserted.\n");
                     }
                     else dbSendMessage(&new_socket, "No value is assigned.\n");
@@ -802,6 +816,7 @@ void *client(void *tmp) {
             else {
                 if (strcmp(commands[1], "*") == 0) {
                     selectFromTable(&new_socket, selectedDatabase, commands[3]);
+                    logging(&current, buffer);
                 }
                 else {
                     // Stores columns that will be selected
@@ -835,6 +850,7 @@ void *client(void *tmp) {
                         printf("col\n");
                         for (int i = 0; i < col_size; i++) printf("%d. `%s`\n", i, col[i]);
                         selectFromTable2(&new_socket, selectedDatabase, tb, col, col_size);
+                        logging(&current, buffer);
                     }
                 }
             }
@@ -847,6 +863,7 @@ void *client(void *tmp) {
                         char buff[128];
                         sprintf(buff, "%d rows affected.\n", affected_row);
                         dbSendMessage(&new_socket, buff);
+                        logging(&current, buffer);
                     }
                     else dbSendMessage(&new_socket, "Syntax error: UPDATE [table name] SET [col] = [value]\n");
                 }
@@ -873,6 +890,7 @@ void *client(void *tmp) {
                             sprintf(buff, "%d affected row.\n", affected_row);
                             dbSendMessage(&new_socket, buff);
                         }
+                        logging(&current, buffer);
                     }
                     else {
                         dbSendMessage(&new_socket, "Table not exist.\n");
@@ -894,17 +912,27 @@ void *client(void *tmp) {
                     char success[STR_SIZE];
                     sprintf(success, "Granted %s permission to database %s\n", commands[4], commands[2]);
                     dbSendMessage(&new_socket, success);
+                    logging(&current, buffer);
                 }
             }
         }
         else if (strcmp(commands[0], "DROP") == 0) {
             if (command_size > 2) {
                 if (strcmp(commands[1], "DATABASE") == 0) {
-                    dropDatabase(commands[2]);
+                    if (doesDatabaseExist(commands[2])) {
+                        dropDatabase(commands[2]);
+                    }
+                    else {
+                        dbSendMessage(&new_socket, "Cannot found database\n");
+                    }
                 }
                 else if (strcmp(commands[1], "TABLE") == 0) {
                     if (doesTableExist(selectedDatabase, commands[2])) {
                         dropTable(selectedDatabase, commands[2]);
+                        logging(&current, buffer);
+                    }
+                    else {
+                        dbSendMessage(&new_socket, "Cannot found table\n");
                     }
                 }
                 else if (strcmp(commands[1], "COLUMN") == 0) {
