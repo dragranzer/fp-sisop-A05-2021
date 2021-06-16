@@ -816,7 +816,7 @@ void *client(void *tmp) {
             else {
                 if (strcmp(commands[1], "*") == 0) {
                     //SELECT * FROM [table] have 4 commands
-                    if(command_size == 4){
+                    if(command_size >= 4){
                         selectFromTable(&new_socket, selectedDatabase, commands[3]);
                         logging(&current, buffer);
                     }else{
