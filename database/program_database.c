@@ -1265,6 +1265,7 @@ void *client(void *tmp) {
                             col_where[k] = commands[i+3][k];
                             k++;
                         }
+                        col_where[k] = '\0';
                         printf("%s\n", col_where);
                         //skip '='
                         k++;
@@ -1276,6 +1277,7 @@ void *client(void *tmp) {
                             k++;
                             j++;
                         }
+                        value[j] = '\0';
                         printf("%s\n", value);
                     }
                     
