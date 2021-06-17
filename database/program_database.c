@@ -1104,7 +1104,8 @@ void *client(void *tmp) {
                                 isValid = true;
                             }
                             // Exit while scope
-                            i = command_size;
+                            //i = command_size;
+                            break;
                         }
                         else {
                             strcpy(col[col_size++], commands[i]);
