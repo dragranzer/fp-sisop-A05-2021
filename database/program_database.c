@@ -765,11 +765,11 @@ int updateInTable2(int *sock, const char *db, const char *tb, char col[MAX_COLUM
         else if (ch == '\n') {
             // New line
             if(isValid){
-                fprintf(fptr2, printable);
+                fprintf(fptr2, "%s", printable);
                 fprintf(fptr2, "\n");
                 aff_row++;
             }else{
-                fprintf(fptr2, printable_nonvalid);
+                fprintf(fptr2, "%s", printable_nonvalid);
                 fprintf(fptr2, "\n");
             }
             
@@ -787,10 +787,10 @@ int updateInTable2(int *sock, const char *db, const char *tb, char col[MAX_COLUM
     }
 
     if(isValid){
-        fprintf(fptr2, printable);
+        fprintf(fptr2, "%s", printable);
         aff_row++;
     }
-    else fprintf(fptr2, printable_nonvalid);
+    else fprintf(fptr2, "%s", printable_nonvalid);
     fclose(fptr2);
     fclose(fptr);
     remove(buff);
