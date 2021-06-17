@@ -1634,6 +1634,30 @@ void *client(void *tmp) {
     Please leave this section alone
 */
 int main(int argc, char const *argv[]) {
+    pid_t pid, sid;
+    pid = fork();
+
+    if (pid < 0) {
+        // Fail to spawn child process.
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        // Kill parent process
+        exit(EXIT_SUCCESS);
+    }
+
+    umask(0);
+
+    sid = setsid();
+    if (sid < 0) {
+        // Failed to set SID
+    }
+
+    // close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+
     int server_fd, \
         new_socket, \
         valread;
