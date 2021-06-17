@@ -47,7 +47,7 @@ bool authenticateClientSide(int argc, char const *argv[]) {
     if (isRoot()) {
         send(sock, ROOT, sizeof(ROOT), 0);
     }
-    else if (argc != 5) {
+    else if (argc != 5 || strcmp(argv[1], "-u") != 0 || strcmp(argv[3], "-p") != 0) {
         send(sock, ERROR, strlen(ERROR), 0);
         printf("Failed to authenticate.\nRecheck if you ran the program correctly.\n");
         return false;

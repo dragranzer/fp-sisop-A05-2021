@@ -5,3 +5,4 @@ database/database.o
 *.nya
 *.log
 *.backup
+*.o
