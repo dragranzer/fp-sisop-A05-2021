@@ -308,6 +308,82 @@ void selectFromTable(int *sock, const char *db, const char *tb) {
     }
     fclose(fptr);
 }
+//Where pada select *
+void selectFromTable3(int *sock, const char *db, const char *tb, const char *col, const char *val) {
+    char buff[256];
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    FILE *fptr = fopen(buff, "r");
+    if (!fptr) return;
+    char printable[STR_SIZE];
+    char ch;
+    char temp[256];
+    int temp_size = 0;
+    char itterator_col[256];
+    int itterator_col_size = 0;
+    bool isInHeader = true;
+    int col_number = 1;
+    bool found_col = false;
+    int itt_col_num = 1;
+    bool row_valid = false;
+    while (fscanf(fptr, "%c", &ch) != EOF){
+        if (ch == '\n') {
+            itt_col_num = 1;
+            
+            if (temp_size) {
+                temp[temp_size++] = '\n';
+                temp[temp_size++] = '\0';
+                if(row_valid || isInHeader)dbSendMessage(sock, temp);
+                //printf("DEBUG:: temp %s\n", temp);
+                temp_size = 0;
+            }
+            isInHeader = false;
+        }
+        else {
+            if(ch == ','){
+                itterator_col[itterator_col_size] = '\0';
+                itterator_col_size = 0;
+                //printf("DEBUG3::itt_col = %s dan val = %s\n",itterator_col, val);
+                if(itt_col_num == col_number){
+                    if(!isInHeader && found_col){
+                        if(strcmp(val, itterator_col) == 0){
+                            row_valid = true;
+                            //printf("INI VALID\n");
+                        }else{
+                            //printf("INI GAK VALID\n");
+                            row_valid = false;
+                        }
+                    }
+                }else{
+                    //row_valid = false;
+                    itt_col_num++;
+                }
+                
+                if(isInHeader && !found_col){
+                    if(strcmp(col, itterator_col) == 0){
+                        //printf("KETEMU col no %d\n", col_number);
+                        found_col = true;
+
+                    }else{
+                        col_number++;
+                    }
+                }
+                memset(itterator_col, 0, sizeof(itterator_col));
+            }else{
+                itterator_col[itterator_col_size++] = ch;
+            }
+            temp[temp_size++] = ch; 
+        }
+    }
+    if (temp_size) {
+        temp[temp_size++] = '\n';
+        temp[temp_size++] = '\0';
+        if(row_valid)dbSendMessage(sock, temp);
+        //printf("DEBUG2:: temp %s\n", temp);
+        temp_size = 0;
+    }
+    fclose(fptr);
+
+}
 
 bool isStringInCol(char s1[MAX_COLUMN_LEN], const char arr[MAX_COLUMN][MAX_COLUMN_LEN], int arr_size) {
     for (int i = 0; i < arr_size; i++) {
@@ -862,8 +938,32 @@ void *client(void *tmp) {
                 if (strcmp(commands[1], "*") == 0) {
                     //SELECT * FROM [table] have 4 commands
                     if(command_size >= 4){
-                        selectFromTable(&new_socket, selectedDatabase, commands[3]);
-                        logging(&current, buffer);
+                        if(command_size == 4){
+                            selectFromTable(&new_socket, selectedDatabase, commands[3]);
+                            logging(&current, buffer);
+                        }else if(strcmp(commands[4], "WHERE") == 0){
+                            int i=0;
+                            char col[MAX_COLUMN_LEN];
+                            //capture columns name
+                            while(commands[5][i] != '='){
+                                col[i] = commands[5][i];
+                                i++;
+                            }
+                            //printf("%s\n", col);
+                            //skip '='
+                            i++;
+                            //capture value
+                            int j=0;
+                            char value[MAX_COLUMN_LEN];
+                            while(commands[5][i] != '\0'){
+                                value[j] = commands[5][i];
+                                i++;
+                                j++;
+                            }
+                            //printf("%s\n", value);
+                            selectFromTable3(&new_socket, selectedDatabase, commands[3], col, value);
+                            //Maybe taruh loging disini??
+                        }
                     }else{
                         dbSendMessage(&new_socket, "Syntax error: SELECT [col1, col2 | *] FROM [table]\n");
                     }
