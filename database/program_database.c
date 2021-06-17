@@ -410,7 +410,9 @@ void selectFromTable2(int *sock, const char *db, const char *tb, const char col[
             tb_col[tb_col_size++] = '\0';
             if (isStringInCol(tb_col, col, col_size)) {
                 tb_col_reserved[tb_col_number] = 1;
-                sprintf(printable, "%s%16s ", printable, tb_col);
+                //aku nemu kalau cuma select 1 column ada pengecualian
+                if(col_size == 1)sprintf(printable, "%16s ", tb_col);
+                else sprintf(printable, "%s%16s ", printable, tb_col);
             }
             tb_col[0] = '\0';
             tb_col_size = 0;
