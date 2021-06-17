@@ -621,8 +621,53 @@ bool hasPermissionToDB(char *name, char *db) {
     return false;
 }
 
-void dropDatabase(char *db) {
+int __dropDatabaseHelper(const char *path) {
+   DIR *d = opendir(path);
+   size_t path_len = strlen(path);
+   int r = -1;
 
+   if (d) {
+      struct dirent *p;
+
+      r = 0;
+      while (!r && (p=readdir(d))) {
+          int r2 = -1;
+          char *buf;
+          size_t len;
+
+          if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, ".."))
+             continue;
+
+          len = path_len + strlen(p->d_name) + 2; 
+          buf = malloc(len);
+
+          if (buf) {
+             struct stat statbuf;
+
+             snprintf(buf, len, "%s/%s", path, p->d_name);
+             if (!stat(buf, &statbuf)) {
+                if (S_ISDIR(statbuf.st_mode))
+                   r2 = __dropDatabaseHelper(buf);
+                else
+                   r2 = unlink(buf);
+             }
+             free(buf);
+          }
+          r = r2;
+      }
+      closedir(d);
+   }
+
+   if (!r)
+      r = rmdir(path);
+
+   return r;
+}
+
+void dropDatabase(char *db) {
+    char path[SIZE];
+    sprintf(path, "%s/%s", DB_PROG_NAME, db);
+    __dropDatabaseHelper(path);
 }
 
 void dropTable(char *db, char *tb) {
@@ -925,10 +970,17 @@ void *client(void *tmp) {
             if (command_size > 2) {
                 if (strcmp(commands[1], "DATABASE") == 0) {
                     if (doesDatabaseExist(commands[2])) {
-                        dropDatabase(commands[2]);
+                        if (hasPermissionToDB(current.name, commands[2])) {
+                            dropDatabase(commands[2]);
+                            logging(&current, buffer);
+                            dbSendMessage(&new_socket, "Database dropped.\n");
+                        }
+                        else {
+                            dbSendMessage(&new_socket, PERM_ERROR);
+                        }
                     }
                     else {
-                        dbSendMessage(&new_socket, "Cannot found database\n");
+                        dbSendMessage(&new_socket, "Cannot found database.\n");
                     }
                 }
                 else if (strcmp(commands[1], "TABLE") == 0) {
