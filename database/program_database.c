@@ -772,7 +772,10 @@ int updateInTable2(int *sock, const char *db, const char *tb, char col[MAX_COLUM
         }
     }
 
-    if(isValid)fprintf(fptr2, printable);
+    if(isValid){
+        fprintf(fptr2, printable);
+        aff_row++;
+    }
     else fprintf(fptr2, printable_nonvalid);
     fclose(fptr2);
     fclose(fptr);
