@@ -784,6 +784,77 @@ int updateInTable2(int *sock, const char *db, const char *tb, char col[MAX_COLUM
     return aff_row;
 }
 
+int dropColumn(int *sock, const char *db, const char *tb, char col[MAX_COLUMN_LEN], char val[]) {
+    char buff[256];
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    char buff2[256];
+    sprintf(buff2, "%s/%s/%s_new.nya", DB_PROG_NAME, db, tb);
+    FILE *fptr = fopen(buff, "r");
+    if (!fptr) return 0;
+    FILE *fptr2 = fopen(buff2, "w");
+    if (!fptr2) return 0;
+    char tb_col[MAX_COLUMN_LEN];
+    int tb_col_size = 0;
+    int set_col_id = 0;
+    int tb_col_number = 0;
+    char ch;
+    // Reading header
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            printf("DEBUG :: tb_col = %s and col = %s\n", tb_col, col);
+            if (strcmp(tb_col, col) == 0) {
+                set_col_id = tb_col_number;
+                fprintf(fptr2, "%s", val);
+            }else{
+                fprintf(fptr2, "%s,", tb_col);
+            }
+            
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+            tb_col_number++;
+        }
+        else if (ch == '\n') {
+            // New line is detected
+            fprintf(fptr2, "\n");
+            break;
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+        }
+    }
+    tb_col_number = 0;
+    // Reading content
+    int aff_row = 0;
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            if ((tb_col_number++) == set_col_id) {
+                fprintf(fptr2, "%s", val);
+                aff_row++;
+            }
+            else {
+                fprintf(fptr2, "%s,", tb_col);
+            }
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+        }
+        else if (ch == '\n') {
+            // New line
+            tb_col_number = 0;
+            fprintf(fptr2, "\n");
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+        }
+    }
+    fclose(fptr2);
+    fclose(fptr);
+    remove(buff);
+    rename(buff2, buff);
+    return aff_row;
+}
+
 int deleteFromTable(char *db, char *tb, char col[], char val[]) {
     char buff[256];
     sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
@@ -1398,6 +1469,8 @@ void *client(void *tmp) {
                 else if (strcmp(commands[1], "COLUMN") == 0) {
                     if (command_size != 5) {
                         dbSendMessage(&new_socket, "Syntax Error: DROP COLUMN [column_name] FROM [table_name]\n");
+                    }else{
+                        dropColumn(&new_socket, selectedDatabase, commands[4], commands[2], "");
                     }
                 }
             }
