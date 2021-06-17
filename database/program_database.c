@@ -643,6 +643,144 @@ int updateInTable(int *sock, const char *db, const char *tb, char col[MAX_COLUMN
     return aff_row;
 }
 
+int updateInTable2(int *sock, const char *db, const char *tb, char col[MAX_COLUMN_LEN], char val[], char *old_val, char *col_in_where) {
+    char buff[256];
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    char buff2[256];
+    sprintf(buff2, "%s/%s/%s_new.nya", DB_PROG_NAME, db, tb);
+    FILE *fptr = fopen(buff, "r");
+    if (!fptr) return 0;
+    FILE *fptr2 = fopen(buff2, "w");
+    if (!fptr2) return 0;
+    char tb_col[MAX_COLUMN_LEN];
+    int tb_col_size = 0;
+    int set_col_id = 0;
+    int tb_col_number = 0;
+    char ch;
+    // Reading header
+    char itt_col[256];
+    int itt_col_size = 0;
+    int col_number = 1;
+    bool col_found = false;
+    memset(itt_col, 0, sizeof(itt_col));
+    
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            itt_col[itt_col_size] = '\0';
+            //printf("DEBUG: itt col = %s and col in where = %s\n", itt_col, col_in_where);
+            if((strcmp(itt_col, col_in_where) == 0) && !col_found){
+                //printf("KETEMU di colnum = %d\n", col_number);
+                col_found = true;
+            }
+
+            if (strcmp(tb_col, col) == 0) {
+                set_col_id = tb_col_number;
+            }
+            fprintf(fptr2, "%s,", tb_col);
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+            tb_col_number++;
+
+            if(!col_found)col_number++;
+            itt_col_size = 0;
+            memset(itt_col, 0, sizeof(itt_col));
+        }
+        else if (ch == '\n') {
+            // New line is detected
+            fprintf(fptr2, "\n");
+            break;
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+            itt_col[itt_col_size++] = ch;
+        }
+    }
+    tb_col_number = 0;
+    // Reading content
+
+    //char itt_col[256];
+    itt_col_size = 0;
+    int itt_col_num = 1;
+    memset(itt_col, 0, sizeof(itt_col));
+    char temp_cell[256];
+    memset(temp_cell, 0, sizeof(temp_cell));
+    int aff_row = 0;
+    bool isValid = false;
+    char printable[256];
+    char printable_nonvalid[256];
+    memset(printable, 0, sizeof(printable));
+    memset(printable_nonvalid, 0, sizeof(printable_nonvalid));
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            itt_col[itt_col_size] = '\0';
+            // printf("DEBUG 2 :: itt_col = %s and old_val = %s\n", itt_col, old_val);
+            // printf("DEBUG 3 :: col_number = %d and itt_col_num = %d\n", col_number, itt_col_num);
+            // printf("DEBUG 4 :: tb_col_num = %d and set_col_id = %d\n", tb_col_number, set_col_id);
+
+            
+            // printf("DEBUG 5 :: temp_cel = %s and val = %s\n\n",temp_cell, val);
+            if ((strcmp(old_val, itt_col) == 0) && (col_number == itt_col_num)) {
+                // fprintf(fptr2, "%s,", val);
+                // aff_row++;
+                isValid = true;
+            }
+            else {
+                //fprintf(fptr2, "%s,", tb_col);
+            }
+
+            if(((tb_col_number++) == set_col_id)){
+                sprintf(temp_cell, "%s,", val);
+                strcat(printable, temp_cell);
+            }else{
+                sprintf(temp_cell, "%s,", tb_col);
+                strcat(printable, temp_cell);
+            }
+
+            sprintf(temp_cell, "%s,", tb_col);
+            strcat(printable_nonvalid, temp_cell);
+
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+
+            itt_col_size = 0;
+            itt_col_num++;
+            memset(itt_col, 0, sizeof(itt_col));
+        }
+        else if (ch == '\n') {
+            // New line
+            if(isValid){
+                fprintf(fptr2, printable);
+                fprintf(fptr2, "\n");
+                aff_row++;
+            }else{
+                fprintf(fptr2, printable_nonvalid);
+                fprintf(fptr2, "\n");
+            }
+            
+            printf("CEK %s\n\n", printable);
+            memset(printable, 0, sizeof(printable));
+            memset(printable_nonvalid, 0, sizeof(printable_nonvalid));
+            itt_col_num = 1;
+            tb_col_number = 0;
+            isValid = false;
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+            itt_col[itt_col_size++] = ch;
+        }
+    }
+
+    if(isValid)fprintf(fptr2, printable);
+    else fprintf(fptr2, printable_nonvalid);
+    fclose(fptr2);
+    fclose(fptr);
+    remove(buff);
+    rename(buff2, buff);
+    return aff_row;
+}
+
 int deleteFromTable(char *db, char *tb, char col[], char val[]) {
     char buff[256];
     sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
@@ -1067,7 +1205,7 @@ void *client(void *tmp) {
                                 col[i] = commands[5][i];
                                 i++;
                             }
-                            //printf("%s\n", col);
+                            printf("%s\n", col);
                             //skip '='
                             i++;
                             //capture value
@@ -1078,7 +1216,7 @@ void *client(void *tmp) {
                                 i++;
                                 j++;
                             }
-                            //printf("%s\n", value);
+                            printf("%s\n", value);
                             selectFromTable3(&new_socket, selectedDatabase, commands[3], col, value);
                             //Maybe taruh loging disini??
                         }
@@ -1092,6 +1230,8 @@ void *client(void *tmp) {
                     int col_size = 0;
                     // Stores table name
                     char tb[MAX_TABLE_LEN];
+                    // Stores value in -> WHERE col = 'value'
+                    char value[MAX_COLUMN_LEN];
                     // Incremental value
                     int i = 1;
                     bool isValid = false;
@@ -1123,7 +1263,7 @@ void *client(void *tmp) {
                             col_where[k] = commands[i+3][k];
                             k++;
                         }
-                        //printf("%s\n", col_where);
+                        printf("%s\n", col_where);
                         //skip '='
                         k++;
                         //capture value
@@ -1134,7 +1274,7 @@ void *client(void *tmp) {
                             k++;
                             j++;
                         }
-                        //printf("%s\n", value);
+                        printf("%s\n", value);
                     }
                     
                     if (!isValid) {
@@ -1159,6 +1299,13 @@ void *client(void *tmp) {
                 if (strcmp(commands[2], "SET") == 0) {
                     if (command_size == 6 && strcmp(commands[4], "=") == 0) {
                         int affected_row = updateInTable(&new_socket, selectedDatabase, commands[1], commands[3], commands[5]);
+                        char buff[128];
+                        sprintf(buff, "%d rows affected.\n", affected_row);
+                        dbSendMessage(&new_socket, buff);
+                        logging(&current, buffer);
+                    }
+                    if(command_size == 10 && strcmp(commands[8], "=") == 0){
+                        int affected_row = updateInTable2(&new_socket, selectedDatabase, commands[1], commands[3], commands[5], commands[9], commands[7]);
                         char buff[128];
                         sprintf(buff, "%d rows affected.\n", affected_row);
                         dbSendMessage(&new_socket, buff);
