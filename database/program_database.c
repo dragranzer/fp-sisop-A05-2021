@@ -461,6 +461,121 @@ void selectFromTable2(int *sock, const char *db, const char *tb, const char col[
     fclose(fptr);
 }
 
+void selectFromTable4(int *sock, const char *db, const char *tb, const char col[MAX_COLUMN][MAX_COLUMN_LEN], int col_size, const char *col_in_where, const char *val) {
+    //printf("CEK col_in_where = %s\n", col_in_where);
+    char buff[256];
+    sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
+    FILE *fptr = fopen(buff, "r");
+    if (!fptr) return;
+    char printable[STR_SIZE];
+    char tb_col[MAX_COLUMN_LEN];
+    char tb_col_size = 0;
+    bool tb_col_reserved[MAX_COLUMN];
+    memset(tb_col_reserved, 0, sizeof(tb_col_reserved));
+    memset(printable, 0, sizeof(printable));
+    int tb_col_number = 0;
+    char ch;
+
+    char itt_cell_name[256];
+    int itt_cell_name_size = 0;
+    int col_number = 1;
+    bool col_founded = false;
+    
+    // Reading header
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            itt_cell_name[itt_cell_name_size] = '\0';
+            itt_cell_name_size = 0;
+            
+            if(!col_founded){
+                //printf("TESS cell name = %s col_in_where = %s\n", itt_cell_name, col_in_where);
+                if(strcmp(itt_cell_name, col_in_where) == 0){
+                    //printf("KETEMU! col number = %d\n", col_number);
+                    col_founded = true;
+                }else{
+                    col_number++;
+                }
+            }
+
+            //printf("DEBUG::itt_col = %s dan col = %s\n",itt_cell_name, col_in_where);
+
+            if (isStringInCol(tb_col, col, col_size)) {
+                tb_col_reserved[tb_col_number] = 1;
+                //printf("PRINTABLE sebelum %s\n", printable);
+                if(col_size == 1)sprintf(printable, "%16s ", tb_col);
+                else sprintf(printable, "%s%16s ", printable, tb_col);
+                //printf("PRINTABLE setelah %s\n", printable);
+            }
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+            tb_col_number++;
+
+            memset(itt_cell_name, 0, sizeof(itt_cell_name));
+        }
+        else if (ch == '\n') {
+            // New line is detected
+            strcat(printable, "\n");
+            dbSendMessage(sock, printable);
+            //printf("PEMBACAAN HEADER %s", printable);
+            break;
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+            itt_cell_name[itt_cell_name_size++] = ch;
+        }
+    }
+    tb_col_number = 0;
+    memset(printable, 0, sizeof(printable));
+
+    int itt_col_num = 1;
+    bool is_cell_valid = false;
+    // Reading content
+    while (fscanf(fptr, "%c", &ch) != EOF) {
+        if (ch == ',') {
+            tb_col[tb_col_size++] = '\0';
+            itt_cell_name[itt_cell_name_size] = '\0';
+            itt_cell_name_size = 0;
+            // printf("DEBUG2::itt_cell = %s dan val = %s\n",itt_cell_name, val);
+            // printf("DEBUG3::itt_col_num = %d dan col_number = %d\n",itt_col_num, col_number);
+            if(itt_col_num == col_number){
+                if(strcmp(itt_cell_name, val) == 0){
+                    //printf("VALID\n");
+                    is_cell_valid = true;
+                }
+            }
+
+            if (tb_col_reserved[tb_col_number++]) {
+                sprintf(printable, "%s%16s ", printable, tb_col);
+            }
+            tb_col[0] = '\0';
+            tb_col_size = 0;
+
+            itt_col_num++;
+            memset(itt_cell_name, 0, sizeof(itt_cell_name));
+        }
+        else if (ch == '\n') {
+            // New line
+            itt_col_num = 1;
+            tb_col_number = 0;
+            strcat(printable, "\n");
+            if(is_cell_valid)dbSendMessage(sock, printable);
+            //printf("%s", printable);
+            is_cell_valid = false;
+            memset(printable, 0, sizeof(printable));
+        }
+        else {
+            tb_col[tb_col_size++] = ch;
+            itt_cell_name[itt_cell_name_size++] = ch;
+        }
+    }
+    strcat(printable, "\n");
+    if(is_cell_valid)dbSendMessage(sock, printable);
+    //printf("%s", printable);
+    memset(printable, 0, sizeof(printable));
+    fclose(fptr);
+}
+
 int updateInTable(int *sock, const char *db, const char *tb, char col[MAX_COLUMN_LEN], char val[]) {
     char buff[256];
     sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
