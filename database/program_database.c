@@ -333,34 +333,34 @@ void selectFromTable3(int *sock, const char *db, const char *tb, const char *col
                 temp[temp_size++] = '\n';
                 temp[temp_size++] = '\0';
                 if(row_valid || isInHeader)dbSendMessage(sock, temp);
-                //printf("DEBUG:: temp %s\n", temp);
+                printf("DEBUG:: temp %s\n", temp);
                 temp_size = 0;
             }
             isInHeader = false;
+            row_valid = false;
         }
         else {
             if(ch == ','){
                 itterator_col[itterator_col_size] = '\0';
                 itterator_col_size = 0;
-                //printf("DEBUG3::itt_col = %s dan val = %s\n",itterator_col, val);
+                printf("DEBUG3::itt_col = %s dan val = %s\n",itterator_col, val);
+                printf("DEBUG3::itt_col_num = %d dan col_number = %d\n",itt_col_num, col_number);
                 if(itt_col_num == col_number){
                     if(!isInHeader && found_col){
                         if(strcmp(val, itterator_col) == 0){
                             row_valid = true;
-                            //printf("INI VALID\n");
+                            printf("INI VALID\n");
                         }else{
-                            //printf("INI GAK VALID\n");
-                            row_valid = false;
+                            // printf("INI GAK VALID\n");
+                            // row_valid = false;
                         }
                     }
-                }else{
-                    //row_valid = false;
-                    itt_col_num++;
                 }
-                
+                itt_col_num++;
+
                 if(isInHeader && !found_col){
                     if(strcmp(col, itterator_col) == 0){
-                        //printf("KETEMU col no %d\n", col_number);
+                        printf("KETEMU col no %d\n", col_number);
                         found_col = true;
 
                     }else{
@@ -378,7 +378,7 @@ void selectFromTable3(int *sock, const char *db, const char *tb, const char *col
         temp[temp_size++] = '\n';
         temp[temp_size++] = '\0';
         if(row_valid)dbSendMessage(sock, temp);
-        //printf("DEBUG2:: temp %s\n", temp);
+        printf("DEBUG2:: temp %s\n", temp);
         temp_size = 0;
     }
     fclose(fptr);
