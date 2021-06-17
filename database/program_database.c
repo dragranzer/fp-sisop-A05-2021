@@ -402,6 +402,7 @@ void selectFromTable2(int *sock, const char *db, const char *tb, const char col[
     char tb_col_size = 0;
     bool tb_col_reserved[MAX_COLUMN];
     memset(tb_col_reserved, 0, sizeof(tb_col_reserved));
+    memset(printable, 0, sizeof(printable));
     int tb_col_number = 0;
     char ch;
     // Reading header
