@@ -4,3 +4,4 @@ client/client.o
 database/database.o
 *.nya
 *.log
+*.backup

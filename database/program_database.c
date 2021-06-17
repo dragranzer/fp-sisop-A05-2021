@@ -952,15 +952,6 @@ void *client(void *tmp) {
         }
         else dbSendMessage(&new_socket, "Command not found.\n");
 
-        // printf("DEBUG Command:\n");
-        // for (int i = 0; i < command_size; i++) {
-        //     printf("%d. `%s`\n", i, commands[i]);
-        // }
-
-        // if (strlen(buffer)) {
-        //     printf("message: %s\n", buffer);
-        // }
-
         memset(buffer, 0, sizeof(buffer));
         memset(commands, 0, sizeof(commands));
     }
