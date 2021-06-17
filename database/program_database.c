@@ -1205,6 +1205,7 @@ void *client(void *tmp) {
                                 col[i] = commands[5][i];
                                 i++;
                             }
+                            col[i]='\0';
                             printf("%s\n", col);
                             //skip '='
                             i++;
@@ -1216,6 +1217,7 @@ void *client(void *tmp) {
                                 i++;
                                 j++;
                             }
+                            value[j]='\0';
                             printf("%s\n", value);
                             selectFromTable3(&new_socket, selectedDatabase, commands[3], col, value);
                             //Maybe taruh loging disini??
