@@ -1111,14 +1111,44 @@ void *client(void *tmp) {
                             i++;
                         }
                     }
+                    
+                    char col_where[MAX_COLUMN_LEN];
+                    if(strcmp(commands[i+2], "WHERE") == 0){
+                        withWhere = true;
+                        int k=0;
+                        
+                        //capture columns name
+                        while(commands[i+3][k] != '='){
+                            col_where[k] = commands[i+3][k];
+                            k++;
+                        }
+                        //printf("%s\n", col_where);
+                        //skip '='
+                        k++;
+                        //capture value
+                        int j=0;
+                        char value[MAX_COLUMN_LEN];
+                        while(commands[i+3][k] != '\0'){
+                            value[j] = commands[i+3][k];
+                            k++;
+                            j++;
+                        }
+                        //printf("%s\n", value);
+                    }
+                    
                     if (!isValid) {
                         dbSendMessage(&new_socket, "Syntax error: SELECT [col1, col2 | *] FROM [table]\n");
                     }
-                    else {
+                    else if(!withWhere){
                         printf("col\n");
                         for (int i = 0; i < col_size; i++) printf("%d. `%s`\n", i, col[i]);
                         selectFromTable2(&new_socket, selectedDatabase, tb, col, col_size);
                         logging(&current, buffer);
+                    }
+                    
+                    if(withWhere && isValid){
+                        //printf("CEK col = %s", col_where);
+                        selectFromTable4(&new_socket, selectedDatabase, tb, col, col_size, col_where, value);
                     }
                 }
             }
