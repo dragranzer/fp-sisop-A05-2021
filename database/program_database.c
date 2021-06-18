@@ -1358,7 +1358,10 @@ void *client(void *tmp) {
         }
         else if(strcmp(commands[0], "USE") == 0) {
             if (doesDatabaseExist(commands[1]) && command_size == 2) {
-                if (hasPermissionToDB(current.name, commands[1])) {
+                if (strcmp(commands[1], AUTH_DB) == 0) {
+                    dbSendMessage(&new_socket, PERM_ERROR);
+                }
+                else if (hasPermissionToDB(current.name, commands[1])) {
                     strcpy(selectedDatabase, commands[1]);
                     logging(&current, buffer);
                     dbSendMessage(&new_socket, "Database selected.\n");
