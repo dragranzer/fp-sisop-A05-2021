@@ -1433,7 +1433,7 @@ void *client(void *tmp) {
                             value[j]='\0';
                             printf("%s\n", value);
                             selectFromTable3(&new_socket, selectedDatabase, commands[3], col, value);
-                            //Maybe taruh loging disini??
+                            logging(&current, buffer);
                         }
                     }else{
                         dbSendMessage(&new_socket, "Syntax error: SELECT [col1, col2 | *] FROM [table]\n");
@@ -1507,6 +1507,7 @@ void *client(void *tmp) {
                     if(withWhere && isValid){
                         //printf("CEK col = %s", col_where);
                         selectFromTable4(&new_socket, selectedDatabase, tb, col, col_size, col_where, value);
+                        logging(&current, buffer);
                     }
                 }
             }
@@ -1610,6 +1611,7 @@ void *client(void *tmp) {
                         dbSendMessage(&new_socket, "Syntax Error: DROP COLUMN [column_name] FROM [table_name]\n");
                     }else{
                         dropColumn(&new_socket, selectedDatabase, commands[4], commands[2], "");
+                        logging(&current, buffer);
                     }
                 }
             }
@@ -1621,6 +1623,7 @@ void *client(void *tmp) {
             // commands[2] stores database name
             if (doesDatabaseExist(commands[2])) {
                 exportDatabase(&new_socket, commands[2]);
+                logging(&current, buffer);
             }
             else dbSendMessage(&new_socket, "Database not found.");
         }
