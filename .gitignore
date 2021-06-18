@@ -6,3 +6,5 @@ database/database.o
 *.log
 *.backup
 *.o
+client/coba_redirect.c
+client/coba_redirect.c
