@@ -1411,27 +1411,34 @@ void *client(void *tmp) {
                             selectFromTable(&new_socket, selectedDatabase, commands[3]);
                             logging(&current, buffer);
                         }else if(strcmp(commands[4], "WHERE") == 0){
-                            int i=0;
                             char col[MAX_COLUMN_LEN];
-                            //capture columns name
-                            while(commands[5][i] != '='){
-                                col[i] = commands[5][i];
-                                i++;
-                            }
-                            col[i]='\0';
-                            printf("%s\n", col);
-                            //skip '='
-                            i++;
-                            //capture value
-                            int j=0;
                             char value[MAX_COLUMN_LEN];
-                            while(commands[5][i] != '\0'){
-                                value[j] = commands[5][i];
+                            if(command_size == 6){
+                                int i=0;
+                                //capture columns name
+                                while(commands[5][i] != '='){
+                                    col[i] = commands[5][i];
+                                    i++;
+                                }
+                                col[i]='\0';
+                                printf("%s\n", col);
+                                //skip '='
                                 i++;
-                                j++;
+                                //capture value
+                                int j=0;
+                                
+                                while(commands[5][i] != '\0'){
+                                    value[j] = commands[5][i];
+                                    i++;
+                                    j++;
+                                }
+                                value[j]='\0';
+                                printf("%s\n", value);
+                            }else if(command_size == 8){
+                                strcpy(col, commands[5]);
+                                strcpy(value, commands[7]);
                             }
-                            value[j]='\0';
-                            printf("%s\n", value);
+                            
                             selectFromTable3(&new_socket, selectedDatabase, commands[3], col, value);
                             logging(&current, buffer);
                         }
@@ -1473,25 +1480,30 @@ void *client(void *tmp) {
                         withWhere = true;
                         int k=0;
                         
-                        //capture columns name
-                        while(commands[i+3][k] != '='){
-                            col_where[k] = commands[i+3][k];
+                       if(command_size == i+4){
+                            //capture columns name
+                            while(commands[i+3][k] != '='){
+                                col_where[k] = commands[i+3][k];
+                                k++;
+                            }
+                            col_where[k] = '\0';
+                            printf("%s\n", col_where);
+                            //skip '='
                             k++;
+                            //capture value
+                            int j=0;
+
+                            while(commands[i+3][k] != '\0'){
+                                value[j] = commands[i+3][k];
+                                k++;
+                                j++;
+                            }
+                            value[j] = '\0';
+                            printf("%s\n", value);
+                        }else if(command_size == 6){
+                            strcpy(col_where, commands[5]);
+                            strcpy(value, commands[7]);
                         }
-                        col_where[k] = '\0';
-                        printf("%s\n", col_where);
-                        //skip '='
-                        k++;
-                        //capture value
-                        int j=0;
-                        char value[MAX_COLUMN_LEN];
-                        while(commands[i+3][k] != '\0'){
-                            value[j] = commands[i+3][k];
-                            k++;
-                            j++;
-                        }
-                        value[j] = '\0';
-                        printf("%s\n", value);
                     }
                     
                     if (!isValid) {
