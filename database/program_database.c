@@ -124,9 +124,12 @@ void createTable(char *db, char *tb, char *attr[64], int size, char dt[MAX_COLUM
     sprintf(buff, "%s/%s/.%s_nya", DB_PROG_NAME, db, tb);
     fptr = fopen(buff, "w");
     if (fptr) {
+        fprintf(fptr, "CREATE TABLE %s (", tb);
         for (int i = 0; i < dt_size; i++) {
-            fprintf(fptr, "%s,", dt[i]);
+            fprintf(fptr, "%s %s", attr[i], dt[i]);
+            if (i != dt_size-1) fprintf(fptr, ", ");
         }
+        fprintf(fptr, ");");
         fclose(fptr);
     }
 }
@@ -1124,31 +1127,33 @@ void exportTable(int *sock, char database_name[], char table_name[]) {
         char query[STR_SIZE];
         char temp[MAX_COLUMN_LEN]; int temp_size = 0;
         char ch;
+        int new_socket = *(int *)sock;
         // Flush query
         memset(query, 0, sizeof(query));
-        sprintf(query, "CREATE TABLE %s (", table_name);
+
+        // Read creation query in special file
+        char nyapath[256];
+        sprintf(nyapath, "%s/%s/.%s_nya", DB_PROG_NAME, database_name, table_name);
+        FILE *header_fptr = fopen(nyapath, "r");
+        if (header_fptr) {
+            memset(query, 0, sizeof(query));
+            int i = 0;
+            while (fscanf(header_fptr, "%c", &ch) != EOF) {
+                query[i++] = ch;
+            }
+            query[i++] = '\0';
+            sprintf(buffer, "%s\n", query);
+            memset(query, 0, sizeof(query));
+            dbSendMessage(&new_socket, buffer);
+            fclose(header_fptr);
+        }
+
         // Reading header
         while (fscanf(fptr, "%c", &ch) != EOF) {
-            if (ch == ',') {
-                temp[temp_size++] = '\0'; // Add null character to for string stop sign
-                strcat(query, temp);
-                strcat(query, " string, ");
-                // Reset temp string
-                temp[0] = '\0'; temp_size = 0;
-            }
-            else if (ch == '\n') 
+            if (ch == '\n') 
                 // New line is reached, stop while loop
                 break;
-            else temp[temp_size++] = ch; // Concat char ch to string temp
         }
-        // Remove ", " at the end of query and put ");"
-        query[strlen(query)-1] = ';';
-        query[strlen(query)-2] = ')';
-
-        int new_socket = *(int *)sock;
-
-        sprintf(buffer, "%s\n", query);
-        dbSendMessage(&new_socket, buffer);
 
         // Flush query
         memset(query, 0, sizeof(query));
@@ -1216,7 +1221,7 @@ void exportDatabase(int *sock, char database_name[]) {
         char buffer[STR_SIZE];
         memset(buffer, 0, sizeof(buffer));
         sprintf(buffer, "CREATE DATABASE %s;\n", database_name);
-        
+
         dbSendMessage(&new_socket, buffer);
 
         while ((ep = readdir(dp))) {
