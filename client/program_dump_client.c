@@ -64,6 +64,7 @@ void *messageHandling(void *arg) {
     char buffer[STR_SIZE];
     int state = 0;
     long tt = -1;
+    memset(buffer, 0, sizeof(buffer));
     while(read(*(int *)arg, buffer, STR_SIZE) != 0) {
         if (strlen(buffer)) {
             printf("%s", buffer); // Print fetched data
