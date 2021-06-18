@@ -1149,6 +1149,8 @@ void *client(void *tmp) {
         valread = read(new_socket, buffer, STR_SIZE);
 
         if (strcmp(buffer, "quit") == 0) {
+            printf("Closing client\n");
+            dbSendMessage(&new_socket, "Closing\n");
             close(new_socket);
             return 0;
         }

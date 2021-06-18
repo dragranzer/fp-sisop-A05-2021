@@ -108,12 +108,33 @@ int main(int argc, char const *argv[]) {
     pthread_t messageHandler;
     pthread_create(&messageHandler, NULL, &messageHandling, &sock);
 
+    bool redir = false;
+
+    if (!isatty(fileno(stdin))) {
+        redir = true;
+    }
+
+    size_t size;
+    char *line = NULL;
+    if (redir) {
+        while (getline(&line, &size, stdin) != -1) {
+            send(sock, line, strlen(line), 0);
+            memset(line, 0, sizeof(line));
+        }
+        printf("\n");
+        send(sock, "quit", strlen("quit"), 0);
+        valread = read(sock, command, sizeof(command));
+        memset(command, 0, sizeof(command));
+        return 0;
+    }
+
     while (true) {
         scanf("%[^\n]s", buffer);
         getchar();
         send(sock, buffer, strlen(buffer), 0);
 
         if (strcmp(buffer, "quit") == 0) {
+            valread = read(sock, command, sizeof(command));
             return 0;
         }
 
