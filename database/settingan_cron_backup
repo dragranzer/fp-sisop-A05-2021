@@ -1,0 +1,1 @@
+0 * * * * cd /home/ryan/Downloads/fp-sisop-A05-2021/client && ./client_dump_database.o -u root -p 123 > database_name.database
