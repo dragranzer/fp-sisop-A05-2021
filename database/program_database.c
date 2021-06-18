@@ -1500,9 +1500,9 @@ void *client(void *tmp) {
                             }
                             value[j] = '\0';
                             printf("%s\n", value);
-                        }else if(command_size == 6){
-                            strcpy(col_where, commands[5]);
-                            strcpy(value, commands[7]);
+                        }else if(command_size == i+6){
+                            strcpy(col_where, commands[i+3]);
+                            strcpy(value, commands[i+5]);
                         }
                     }
                     
