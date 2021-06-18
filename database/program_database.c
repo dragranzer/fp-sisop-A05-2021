@@ -111,7 +111,7 @@ void createDatabase(char *name) {
     mkdir(buff, 0777);
 }
 
-void createTable(char *db, char *tb, char *attr[64], int size) {
+void createTable(char *db, char *tb, char *attr[64], int size, char dt[MAX_COLUMN][32], int dt_size) {
     char buff[256];
     sprintf(buff, "%s/%s/%s.nya", DB_PROG_NAME, db, tb);
     FILE *fptr = fopen(buff, "w");
@@ -120,6 +120,15 @@ void createTable(char *db, char *tb, char *attr[64], int size) {
         fprintf(fptr, "%s,", attr[i]);
     }
     fclose(fptr);
+    // Create table information
+    sprintf(buff, "%s/%s/.%s_nya", DB_PROG_NAME, db, tb);
+    fptr = fopen(buff, "w");
+    if (fptr) {
+        for (int i = 0; i < dt_size; i++) {
+            fprintf(fptr, "%s,", dt[i]);
+        }
+        fclose(fptr);
+    }
 }
 
 void insertToTable(char *db, char *tb, char *attr_data[64], int size) {
@@ -176,7 +185,8 @@ void __createUsersTable() {
     attr[0] = "name";
     attr[1] = "pass";
     if (!doesTableExist(AUTH_DB, USER_TABLE)) {
-        createTable(AUTH_DB, USER_TABLE, attr, 2);
+        char dt[2][32] = {"string", "string"};
+        createTable(AUTH_DB, USER_TABLE, attr, 2, dt, 2);
     }
 }
 
@@ -185,7 +195,8 @@ void __createPermissionsTable() {
     attr[0] = "database";
     attr[1] = "user";
     if (!doesTableExist(AUTH_DB, PERM_TABLE)) {
-        createTable(AUTH_DB, PERM_TABLE, attr, 2);
+        char dt[2][32] = {"string", "string"};
+        createTable(AUTH_DB, PERM_TABLE, attr, 2, dt, 2);
     }
 }
 
@@ -1103,6 +1114,127 @@ void logging(User *user, char *command) {
     fclose(out);
 }
 
+void exportTable(int *sock, char database_name[], char table_name[]) {
+    printf("DEBUG: Exporting %s.%s\n", database_name, table_name);
+    char path[256];
+    sprintf(path, "%s/%s/%s.nya", DB_PROG_NAME, database_name, table_name);
+    FILE *fptr = fopen(path, "r");
+    if (fptr) {
+        char buffer[STR_SIZE];
+        char query[STR_SIZE];
+        char temp[MAX_COLUMN_LEN]; int temp_size = 0;
+        char ch;
+        // Flush query
+        memset(query, 0, sizeof(query));
+        sprintf(query, "CREATE TABLE %s (", table_name);
+        // Reading header
+        while (fscanf(fptr, "%c", &ch) != EOF) {
+            if (ch == ',') {
+                temp[temp_size++] = '\0'; // Add null character to for string stop sign
+                strcat(query, temp);
+                strcat(query, " string, ");
+                // Reset temp string
+                temp[0] = '\0'; temp_size = 0;
+            }
+            else if (ch == '\n') 
+                // New line is reached, stop while loop
+                break;
+            else temp[temp_size++] = ch; // Concat char ch to string temp
+        }
+        // Remove ", " at the end of query and put ");"
+        query[strlen(query)-1] = ';';
+        query[strlen(query)-2] = ')';
+
+        int new_socket = *(int *)sock;
+
+        sprintf(buffer, "%s\n", query);
+        dbSendMessage(&new_socket, buffer);
+
+        // Flush query
+        memset(query, 0, sizeof(query));
+
+        strcpy(query, "INSERT INTO ");
+        strcat(query, table_name);
+        strcat(query, " (");
+
+        // Reading content
+        while (fscanf(fptr, "%c", &ch) != EOF) {
+            if (ch == ',') {
+                temp[temp_size++] = '\0';
+                strcat(query, temp);
+                strcat(query, ", ");
+                // Reset temp string
+                temp[0] = '\0'; temp_size = 0;
+            }
+            else if (ch == '\n') {
+                // Replace ", " to ");" at the end of query string
+                query[strlen(query)-1] = ';';
+                query[strlen(query)-2] = ')';
+                // Post
+                sprintf(buffer, "%s\n", query);
+                dbSendMessage(&new_socket, buffer);
+
+                // Flush query
+                memset(query, 0, sizeof(query));
+                
+                // Construct pre-query string
+                strcpy(query, "INSERT INTO ");
+                strcat(query, table_name);
+                strcat(query, " (");
+            }
+            else temp[temp_size++] = ch;
+        }
+
+        // Replace ", " to ");" at the end of query string
+        query[strlen(query)-1] = ';';
+        query[strlen(query)-2] = ')';
+        // Post
+        sprintf(buffer, "%s\n", query);
+        dbSendMessage(&new_socket, buffer);
+        
+        // Flush query
+        memset(query, 0, sizeof(query));
+
+        fclose(fptr);
+    }
+}
+
+void exportDatabase(int *sock, char database_name[]) {
+    // Use dirent.h library to list all tables.
+    DIR *dp;
+    struct dirent *ep;
+    
+    char path[256];
+    sprintf(path, "%s/%s", DB_PROG_NAME, database_name);
+
+    dp = opendir(path);
+
+    if (dp) {
+        int new_socket = *(int *)sock;
+
+
+        char buffer[STR_SIZE];
+        memset(buffer, 0, sizeof(buffer));
+        sprintf(buffer, "CREATE DATABASE %s;\n", database_name);
+        
+        dbSendMessage(&new_socket, buffer);
+
+        while ((ep = readdir(dp))) {
+            // Ignore hidden files
+            if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0 || ep->d_name[0] == '.') continue;
+            char table_name[64];
+            strcpy(table_name, ep->d_name);
+            // Remove .nya extension from string table_name
+            table_name[strlen(table_name)-4] = '\0';
+            exportTable(sock, database_name, table_name);
+        }
+
+        close (new_socket);
+
+        closedir(dp);
+    }
+}
+
 void *client(void *tmp) {
     char buffer[STR_SIZE] = {0};
 
@@ -1178,16 +1310,16 @@ void *client(void *tmp) {
                 if (selectedDatabase[0] == '\0') dbSendMessage(&new_socket, "No database is selected.\n");
                 else {
                     // CREATE TABLE name (name int, name int)
-                    char *attr[64];
-                    int attr_i = 0;
+                    char *attr[64], dt[MAX_COLUMN][32];
+                    int attr_i = 0, dt_size = 0;
                     int i = 0;
                     for (int i = 3; i < command_size; i += 2) {
                         attr[attr_i++] = commands[i];
-                        printf("Selected %s\n", commands[i]);
+                        strcpy(dt[dt_size++], commands[i+1]);
                     }
 
                     if (!doesTableExist(selectedDatabase, commands[2])) {
-                        createTable(selectedDatabase, commands[2], attr, attr_i);
+                        createTable(selectedDatabase, commands[2], attr, attr_i, dt, dt_size);
                         logging(&current, buffer);
                         dbSendMessage(&new_socket, "Table created.\n");
                     }
@@ -1477,6 +1609,13 @@ void *client(void *tmp) {
             else {
                 dbSendMessage(&new_socket, "Syntax Error on DROP query\n");
             }
+        }
+        else if (command_size == 3 && strcmp(commands[0], "EXPORT") == 0 && strcmp(commands[1], "DATABASE") == 0) {
+            // commands[2] stores database name
+            if (doesDatabaseExist(commands[2])) {
+                exportDatabase(&new_socket, commands[2]);
+            }
+            else dbSendMessage(&new_socket, "Database not found.");
         }
         else dbSendMessage(&new_socket, "Command not found.\n");
 
